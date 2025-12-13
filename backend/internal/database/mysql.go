@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/yousaling0624/database-course-project/backend/internal/model"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -14,11 +15,9 @@ var DB *gorm.DB
 
 func Connect() {
 	// Defaults
-	dsn := "user:password@tcp(127.0.0.1:3306)/pharmacy_db?charset=utf8mb4&parseTime=True&loc=Local"
+	dsn := "root:root@tcp(127.0.0.1:3306)/pharma_db?charset=utf8mb4&parseTime=True&loc=Local"
 
-	// Override with env if needed (or just hardcode for this simple project as requested)
-	// For Docker, we might need to change host to "mysql" but for local run "127.0.0.1" is fine if port mapped.
-	// We'll try to read from env or fallback.
+	// Override with env if needed
 	if tempDSN := os.Getenv("DSN"); tempDSN != "" {
 		dsn = tempDSN
 	}
@@ -51,17 +50,36 @@ func Connect() {
 }
 
 func seedAdmin() {
-	var count int64
-	DB.Model(&model.User{}).Count(&count)
-	if count == 0 {
-		// Create admin: password is 'password'
-		// Hash: $2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy
+	// Dynamic hash generation to ensure correctness
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
+
+	var user model.User
+	result := DB.Where("username = ?", "admin").First(&user)
+
+	if result.Error == gorm.ErrRecordNotFound {
+		// Create admin
 		admin := model.User{
 			Username: "admin",
-			Password: "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy",
+			Password: string(hashedPassword),
 			Role:     "admin",
 		}
 		DB.Create(&admin)
 		log.Println("Seeded admin user")
+	} else {
+		// Update existing admin password
+		user.Password = string(hashedPassword)
+		DB.Save(&user)
+		log.Println("Updated admin password")
+	}
+
+	// Reset all other users' passwords to "password" for demo purposes
+	var users []model.User
+	DB.Where("username != ?", "admin").Find(&users)
+	for _, u := range users {
+		u.Password = string(hashedPassword)
+		DB.Save(&u)
+	}
+	if len(users) > 0 {
+		log.Printf("Reset passwords for %d users", len(users))
 	}
 }

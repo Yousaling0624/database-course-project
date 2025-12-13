@@ -1,22 +1,20 @@
-version: '3.8'
-
 services:
   mysql:
     image: mysql:8.0
     container_name: pharmacy_mysql
     environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: pharmacy_db
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: pharma_db
       MYSQL_USER: user
       MYSQL_PASSWORD: password
-    ports:
-      - "3306:3306"
+    # ports:
+    #   - "127.0.0.1:33306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./backend/internal/database/init.sql:/docker-entrypoint-initdb.d/init.sql
+      # - ./backend/internal/database/init.sql:/docker-entrypoint-initdb.d/init.sql # Disable init.sql to rely on GORM AutoMigrate
     command: --default-authentication-plugin=mysql_native_password
     healthcheck:
-      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot" ]
       timeout: 20s
       retries: 10
 
@@ -24,7 +22,7 @@ services:
     build: ./backend
     container_name: pharmacy_backend
     environment:
-      DSN: user:password@tcp(mysql:3306)/pharmacy_db?charset=utf8mb4&parseTime=True&loc=Local
+      DSN: root:root@tcp(mysql:3306)/pharma_db?charset=utf8mb4&parseTime=True&loc=Local
     ports:
       - "8080:8080"
     depends_on:
@@ -34,8 +32,13 @@ services:
   frontend:
     build: ./frontend
     container_name: pharmacy_frontend
+    environment:
+      VITE_API_URL: http://backend:8080
     ports:
       - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
     depends_on:
       - backend
 

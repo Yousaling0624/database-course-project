@@ -7,7 +7,9 @@ import (
 type User struct {
 	ID        int64     `gorm:"primaryKey" json:"id"`
 	Username  string    `gorm:"unique;not null" json:"username"`
-	Password  string    `gorm:"not null" json:"-"` // Don't return password
+	Password  string    `gorm:"not null" json:"-"`
+	RealName  string    `json:"real_name"`
+	Phone     string    `json:"phone"`
 	Role      string    `gorm:"default:staff" json:"role"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -17,12 +19,12 @@ type Medicine struct {
 	ID           int64   `gorm:"primaryKey" json:"id"`
 	Code         string  `gorm:"unique;not null" json:"code"`
 	Name         string  `gorm:"not null" json:"name"`
-	Type         string  `gorm:"not null" json:"type"` // OTC, Rx, etc.
+	Type         string  `gorm:"not null" json:"type"`
 	Spec         string  `json:"spec"`
 	Price        float64 `gorm:"type:decimal(10,2);not null" json:"price"`
 	Stock        int     `gorm:"not null;default:0" json:"stock"`
 	Manufacturer string  `json:"manufacturer"`
-	Status       string  `gorm:"default:active" json:"status"` // active, inactive
+	Status       string  `gorm:"default:active" json:"status"`
 }
 
 type Customer struct {
@@ -48,7 +50,6 @@ type Inbound struct {
 	Price       float64   `gorm:"type:decimal(10,2);not null" json:"price"`
 	InboundDate time.Time `json:"inbound_date"`
 
-	// Preload
 	Medicine *Medicine `gorm:"foreignKey:MedicineID" json:"medicine,omitempty"`
 	Supplier *Supplier `gorm:"foreignKey:SupplierID" json:"supplier,omitempty"`
 }
@@ -62,7 +63,6 @@ type Sales struct {
 	SaleDate   time.Time `json:"sale_date"`
 	CustomerID int64     `json:"customer_id"`
 
-	// Preload
 	Medicine *Medicine `gorm:"foreignKey:MedicineID" json:"medicine,omitempty"`
 	Customer *Customer `gorm:"foreignKey:CustomerID" json:"customer,omitempty"`
 }

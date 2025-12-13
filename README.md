@@ -1,37 +1,40 @@
-# databaseCourseProject
+# Pharmaceutical Sales Management System (医药销售管理系统)
 
-#### 介绍
-数据库课程实践
+A full-stack sales management system built with Go (Backend) and React (Frontend).
 
-#### 软件架构
-软件架构说明
+## Tech Stack
+- **Backend**: Go, Gin, GORM, MySQL
+- **Frontend**: React, Vite, Tailwind CSS, React Router
 
+## Prerequisites
+- **Go**: Version 1.18+
+- **Node.js**: Version 16+
+- **MySQL**: Running on `localhost:3306`
+  - Create a database named `pharma_db` (or it will accept the default connection if root has no password, otherwise update `backend/cmd/main.go`)
 
-#### 安装教程
+## Quick Start
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+### 1. Start the Backend
+Open a terminal in the `backend` directory:
+```bash
+cd backend
+go run cmd/main.go
+# Server starts at http://localhost:8080
+```
+*Note: The system will automatically migrate database tables and create a default admin user (admin/password).*
 
-#### 使用说明
+### 2. Start the Frontend
+Open a new terminal in the `frontend` directory:
+```bash
+cd frontend
+npm install # Only needed first time
+npm run dev
+# App starts at http://localhost:3000
+```
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
-
-#### 参与贡献
-
-1.  Fork 本仓库
-2.  新建 Feat_xxx 分支
-3.  提交代码
-4.  新建 Pull Request
-
-
-#### 特技
-
-1.  使用 Readme\_XXX.md 来支持不同的语言，例如 Readme\_en.md, Readme\_zh.md
-2.  Gitee 官方博客 [blog.gitee.com](https://blog.gitee.com)
-3.  你可以 [https://gitee.com/explore](https://gitee.com/explore) 这个地址来了解 Gitee 上的优秀开源项目
-4.  [GVP](https://gitee.com/gvp) 全称是 Gitee 最有价值开源项目，是综合评定出的优秀开源项目
-5.  Gitee 官方提供的使用手册 [https://gitee.com/help](https://gitee.com/help)
-6.  Gitee 封面人物是一档用来展示 Gitee 会员风采的栏目 [https://gitee.com/gitee-stars/](https://gitee.com/gitee-stars/)
+## Features
+- **Dashboard**: Real-time sales and stock metrics.
+- **Inventory**: Manage medicines, prices, and stock levels.
+- **Sales**: Process customer orders and update stock automatically.
+- **Purchasing**: Register inbound stock from suppliers.
+- **Personnel**: Manage employee accounts.
