@@ -1,13 +1,8 @@
 import axios from 'axios';
 
-// Use full URL for Electron app, relative URL for dev server with proxy
-const baseURL = window.location.protocol === 'file:'
-    ? 'http://localhost:8080/api'  // Electron (file:// protocol)
-    : '/api';                       // Vite dev server (http:// with proxy)
-
 const request = axios.create({
-    baseURL,
-    timeout: 10000,
+    baseURL: '/api', // Proxy in vite config handles localhost:8080
+    timeout: 5000,
 });
 
 request.interceptors.response.use(
