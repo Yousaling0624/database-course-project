@@ -2,10 +2,13 @@ package api
 
 import (
 	"fmt"
+	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/yousaling0624/database-course-project/backend/internal/config"
 	"github.com/yousaling0624/database-course-project/backend/internal/database"
 	"github.com/yousaling0624/database-course-project/backend/internal/model"
 	"golang.org/x/crypto/bcrypt"
@@ -19,6 +22,25 @@ func Login(c *gin.Context) {
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// If database is not connected, allow admin/password login
+	if !database.IsConnected {
+		if req.Username == "admin" && req.Password == "password" {
+			c.JSON(http.StatusOK, gin.H{
+				"message": "Login successful (offline mode)",
+				"token":   "offline-token",
+				"user": gin.H{
+					"id":        0,
+					"username":  "admin",
+					"real_name": "Administrator",
+					"role":      "admin",
+				},
+			})
+			return
+		}
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Database not connected. Only admin can login."})
 		return
 	}
 
@@ -481,9 +503,37 @@ func GetFinancialReport(c *gin.Context) {
 	var salesIncome float64
 	database.DB.Model(&model.Sales{}).Select("COALESCE(sum(total_price), 0)").Where("sale_date >= ?", startDate).Row().Scan(&salesIncome)
 
-	// Purchase cost
+	// Purchase cost (Total expenditure)
 	var purchaseCost float64
 	database.DB.Model(&model.Inbound{}).Select("COALESCE(sum(price * quantity), 0)").Where("inbound_date >= ?", startDate).Row().Scan(&purchaseCost)
+
+	// Calculate Cost of Goods Sold (COGS) based on sold items
+	var sales []model.Sales
+	database.DB.Where("sale_date >= ?", startDate).Find(&sales)
+
+	// Get average cost for each medicine
+	type Cost struct {
+		MedicineID int64
+		AvgCost    float64
+	}
+	var costs []Cost
+	// Using average inbound price as an approximation for cost price
+	database.DB.Model(&model.Inbound{}).
+		Select("medicine_id, AVG(price) as avg_cost").
+		Group("medicine_id").
+		Scan(&costs)
+
+	costMap := make(map[int64]float64)
+	for _, c := range costs {
+		costMap[c.MedicineID] = c.AvgCost
+	}
+
+	var totalCOGS float64
+	for _, s := range sales {
+		if cost, ok := costMap[s.MedicineID]; ok {
+			totalCOGS += float64(s.Quantity) * cost
+		}
+	}
 
 	// Sales count
 	var salesCount int64
@@ -498,7 +548,7 @@ func GetFinancialReport(c *gin.Context) {
 		"start_date":     startDate,
 		"sales_income":   salesIncome,
 		"purchase_cost":  purchaseCost,
-		"gross_profit":   salesIncome - purchaseCost,
+		"gross_profit":   salesIncome - totalCOGS, // Profit based on sales vs COGS
 		"sales_count":    salesCount,
 		"purchase_count": purchaseCount,
 	})
@@ -642,82 +692,155 @@ func AdjustStock(c *gin.Context) {
 }
 
 // ==================== System Maintenance ====================
+
+// BackupDatabase exports all data as SQL statements
 func BackupDatabase(c *gin.Context) {
-	// Export all data as JSON
-	var users []model.User
-	var medicines []model.Medicine
-	var customers []model.Customer
+	var sql strings.Builder
+
+	sql.WriteString("-- 康源医药管理系统 - 数据库备份\n")
+	sql.WriteString(fmt.Sprintf("-- 备份时间: %s\n", time.Now().Format("2006-01-02 15:04:05")))
+	sql.WriteString("-- ========================================\n\n")
+
+	sql.WriteString("SET FOREIGN_KEY_CHECKS = 0;\n\n")
+
+	// Backup suppliers
 	var suppliers []model.Supplier
-	var inbounds []model.Inbound
-	var sales []model.Sales
-
-	database.DB.Find(&users)
-	database.DB.Find(&medicines)
-	database.DB.Find(&customers)
 	database.DB.Find(&suppliers)
-	database.DB.Find(&inbounds)
-	database.DB.Find(&sales)
-
-	backup := gin.H{
-		"backup_time": time.Now(),
-		"users":       users,
-		"medicines":   medicines,
-		"customers":   customers,
-		"suppliers":   suppliers,
-		"inbounds":    inbounds,
-		"sales":       sales,
+	if len(suppliers) > 0 {
+		sql.WriteString("-- 供应商数据\n")
+		sql.WriteString("TRUNCATE TABLE suppliers;\n")
+		sql.WriteString("INSERT INTO suppliers (id, name, contact, phone, created_at) VALUES\n")
+		for i, s := range suppliers {
+			sql.WriteString(fmt.Sprintf("(%d, '%s', '%s', '%s', '%s')",
+				s.ID, escapeSQL(s.Name), escapeSQL(s.Contact), escapeSQL(s.Phone), s.CreatedAt.Format("2006-01-02 15:04:05")))
+			if i < len(suppliers)-1 {
+				sql.WriteString(",\n")
+			} else {
+				sql.WriteString(";\n\n")
+			}
+		}
 	}
 
-	c.JSON(http.StatusOK, backup)
+	// Backup customers
+	var customers []model.Customer
+	database.DB.Find(&customers)
+	if len(customers) > 0 {
+		sql.WriteString("-- 客户数据\n")
+		sql.WriteString("TRUNCATE TABLE customers;\n")
+		sql.WriteString("INSERT INTO customers (id, name, phone, created_at) VALUES\n")
+		for i, c := range customers {
+			sql.WriteString(fmt.Sprintf("(%d, '%s', '%s', '%s')",
+				c.ID, escapeSQL(c.Name), escapeSQL(c.Phone), c.CreatedAt.Format("2006-01-02 15:04:05")))
+			if i < len(customers)-1 {
+				sql.WriteString(",\n")
+			} else {
+				sql.WriteString(";\n\n")
+			}
+		}
+	}
+
+	// Backup medicines
+	var medicines []model.Medicine
+	database.DB.Find(&medicines)
+	if len(medicines) > 0 {
+		sql.WriteString("-- 药品数据\n")
+		sql.WriteString("TRUNCATE TABLE medicines;\n")
+		sql.WriteString("INSERT INTO medicines (id, code, name, type, spec, price, stock, manufacturer, status) VALUES\n")
+		for i, m := range medicines {
+			sql.WriteString(fmt.Sprintf("(%d, '%s', '%s', '%s', '%s', %.2f, %d, '%s', '%s')",
+				m.ID, escapeSQL(m.Code), escapeSQL(m.Name), escapeSQL(m.Type), escapeSQL(m.Spec),
+				m.Price, m.Stock, escapeSQL(m.Manufacturer), escapeSQL(m.Status)))
+			if i < len(medicines)-1 {
+				sql.WriteString(",\n")
+			} else {
+				sql.WriteString(";\n\n")
+			}
+		}
+	}
+
+	// Backup inbounds
+	var inbounds []model.Inbound
+	database.DB.Find(&inbounds)
+	if len(inbounds) > 0 {
+		sql.WriteString("-- 入库记录\n")
+		sql.WriteString("TRUNCATE TABLE inbounds;\n")
+		sql.WriteString("INSERT INTO inbounds (id, medicine_id, supplier_id, quantity, price, inbound_date) VALUES\n")
+		for i, ib := range inbounds {
+			sql.WriteString(fmt.Sprintf("(%d, %d, %d, %d, %.2f, '%s')",
+				ib.ID, ib.MedicineID, ib.SupplierID, ib.Quantity, ib.Price, ib.InboundDate.Format("2006-01-02 15:04:05")))
+			if i < len(inbounds)-1 {
+				sql.WriteString(",\n")
+			} else {
+				sql.WriteString(";\n\n")
+			}
+		}
+	}
+
+	// Backup sales
+	var sales []model.Sales
+	database.DB.Find(&sales)
+	if len(sales) > 0 {
+		sql.WriteString("-- 销售记录\n")
+		sql.WriteString("TRUNCATE TABLE sales;\n")
+		sql.WriteString("INSERT INTO sales (id, order_id, medicine_id, customer_id, quantity, total_price, sale_date) VALUES\n")
+		for i, s := range sales {
+			sql.WriteString(fmt.Sprintf("(%d, '%s', %d, %d, %d, %.2f, '%s')",
+				s.ID, escapeSQL(s.OrderID), s.MedicineID, s.CustomerID, s.Quantity, s.TotalPrice, s.SaleDate.Format("2006-01-02 15:04:05")))
+			if i < len(sales)-1 {
+				sql.WriteString(",\n")
+			} else {
+				sql.WriteString(";\n\n")
+			}
+		}
+	}
+
+	sql.WriteString("SET FOREIGN_KEY_CHECKS = 1;\n")
+
+	// Return as downloadable SQL file
+	c.Header("Content-Type", "application/sql; charset=utf-8")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=backup_%s.sql", time.Now().Format("20060102_150405")))
+	c.String(http.StatusOK, sql.String())
 }
 
-func RestoreDatabase(c *gin.Context) {
-	var backup struct {
-		Users     []model.User     `json:"users"`
-		Medicines []model.Medicine `json:"medicines"`
-		Customers []model.Customer `json:"customers"`
-		Suppliers []model.Supplier `json:"suppliers"`
-		Inbounds  []model.Inbound  `json:"inbounds"`
-		Sales     []model.Sales    `json:"sales"`
-	}
+// escapeSQL escapes single quotes in SQL strings
+func escapeSQL(s string) string {
+	return strings.ReplaceAll(s, "'", "''")
+}
 
-	if err := c.ShouldBindJSON(&backup); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+// RestoreDatabase imports data from SQL file content
+func RestoreDatabase(c *gin.Context) {
+	// Read SQL content from request body
+	sqlContent, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "无法读取SQL文件内容"})
 		return
 	}
 
+	sqlStr := string(sqlContent)
+	if len(sqlStr) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "SQL文件内容为空"})
+		return
+	}
+
+	// Split SQL into statements
+	statements := strings.Split(sqlStr, ";")
+
 	tx := database.DB.Begin()
 
-	// Clear existing data
-	tx.Exec("DELETE FROM sales")
-	tx.Exec("DELETE FROM inbounds")
-	tx.Exec("DELETE FROM suppliers")
-	tx.Exec("DELETE FROM customers")
-	tx.Exec("DELETE FROM medicines")
-	tx.Exec("DELETE FROM users")
-
-	// Restore data
-	for _, u := range backup.Users {
-		tx.Create(&u)
-	}
-	for _, m := range backup.Medicines {
-		tx.Create(&m)
-	}
-	for _, c := range backup.Customers {
-		tx.Create(&c)
-	}
-	for _, s := range backup.Suppliers {
-		tx.Create(&s)
-	}
-	for _, i := range backup.Inbounds {
-		tx.Create(&i)
-	}
-	for _, s := range backup.Sales {
-		tx.Create(&s)
+	for _, stmt := range statements {
+		stmt = strings.TrimSpace(stmt)
+		if stmt == "" || strings.HasPrefix(stmt, "--") {
+			continue
+		}
+		if err := tx.Exec(stmt).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("执行SQL失败: %s", err.Error())})
+			return
+		}
 	}
 
 	tx.Commit()
-	c.JSON(http.StatusOK, gin.H{"message": "Database restored successfully"})
+	c.JSON(http.StatusOK, gin.H{"message": "数据库恢复成功"})
 }
 
 // ==================== Fuzzy Search ====================
@@ -740,4 +863,111 @@ func SearchSuppliers(c *gin.Context) {
 	var suppliers []model.Supplier
 	database.DB.Where("name LIKE ? OR contact LIKE ?", "%"+keyword+"%", "%"+keyword+"%").Find(&suppliers)
 	c.JSON(http.StatusOK, suppliers)
+}
+
+// ==================== Database Configuration ====================
+
+// GetDatabaseStatus returns current database connection status
+func GetDatabaseStatus(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"connected": database.IsConnected,
+	})
+}
+
+// GetDatabaseConfig returns current database configuration (password masked)
+func GetDatabaseConfig(c *gin.Context) {
+	cfg := config.Get()
+	if cfg == nil {
+		// Return defaults
+		cfg = config.Default()
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"host":     cfg.Database.Host,
+		"port":     cfg.Database.Port,
+		"user":     cfg.Database.User,
+		"password": "********", // Mask password
+		"database": cfg.Database.Database,
+	})
+}
+
+// TestDatabaseConfig tests a database connection without saving
+func TestDatabaseConfig(c *gin.Context) {
+	var req struct {
+		Host     string `json:"host"`
+		Port     int    `json:"port"`
+		User     string `json:"user"`
+		Password string `json:"password"`
+		Database string `json:"database"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+		req.User, req.Password, req.Host, req.Port, req.Database)
+
+	if err := database.TestConnection(dsn); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "Connection successful",
+	})
+}
+
+// UpdateDatabaseConfig saves new database configuration and reconnects
+func UpdateDatabaseConfig(c *gin.Context) {
+	var req struct {
+		Host     string `json:"host"`
+		Port     int    `json:"port"`
+		User     string `json:"user"`
+		Password string `json:"password"`
+		Database string `json:"database"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Build new config
+	cfg := &config.Config{
+		Database: config.DatabaseConfig{
+			Host:     req.Host,
+			Port:     req.Port,
+			User:     req.User,
+			Password: req.Password,
+			Database: req.Database,
+		},
+	}
+
+	// Try to connect first
+	dsn := cfg.Database.GetDSN()
+	if err := database.Reconnect(dsn); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Failed to connect: " + err.Error(),
+		})
+		return
+	}
+
+	// Save config
+	if err := config.Save(cfg); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Connected but failed to save config: " + err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "Database configuration updated and connected",
+	})
 }

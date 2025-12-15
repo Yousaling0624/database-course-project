@@ -28,6 +28,7 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [toast, setToast] = useState(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
@@ -56,11 +57,20 @@ function App() {
 
   return (
     <Router>
-      <div className="flex h-screen bg-slate-50 font-sans text-slate-600">
-        <Sidebar onLogout={handleLogout} userRole={userRole} currentUser={currentUser} />
+      <div className="flex h-screen bg-slate-50 font-sans text-slate-600 overflow-hidden">
+        <Sidebar
+          onLogout={handleLogout}
+          userRole={userRole}
+          currentUser={currentUser}
+          isOpen={isMobileMenuOpen}
+          onClose={() => setIsMobileMenuOpen(false)}
+        />
 
-        <div className="flex-1 flex flex-col overflow-hidden relative">
-          <Navbar currentUser={currentUser} />
+        <div className="flex-1 flex flex-col overflow-hidden relative w-full">
+          <Navbar
+            currentUser={currentUser}
+            onMenuClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          />
 
           <main className="flex-1 overflow-y-auto p-8">
             <div className="max-w-7xl mx-auto">

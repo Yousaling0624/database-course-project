@@ -60,3 +60,9 @@ export const searchUsers = (keyword) => request.get('/search/users', { params: {
 export const searchCustomers = (keyword) => request.get('/search/customers', { params: { keyword } });
 export const searchSuppliers = (keyword) => request.get('/search/suppliers', { params: { keyword } });
 
+// Database Configuration
+export const getDatabaseStatus = () => request.get('/system/database/status');
+export const getDatabaseConfig = () => request.get('/system/database');
+export const updateDatabaseConfig = (data) => request.post('/system/database', data, { timeout: 30000 });
+export const testDatabaseConfig = (data) => request.post('/system/database/test', data, { timeout: 30000 });
+export const resetSampleData = () => request.post('/system/reset-sample-data', {}, { timeout: 60000 });

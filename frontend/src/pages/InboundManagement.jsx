@@ -66,11 +66,11 @@ export default function InboundManagement({ showToast }) {
     return (
         <div className="space-y-6">
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-                <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <h2 className="text-lg font-bold text-slate-800">入库管理</h2>
                     <button
                         onClick={handleOpenModal}
-                        className="flex items-center px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium rounded-lg transition-colors shadow-lg shadow-slate-900/10"
+                        className="w-full sm:w-auto flex items-center justify-center px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium rounded-lg transition-colors shadow-lg shadow-slate-900/10"
                     >
                         <Plus size={16} className="mr-2" />
                         新建入库单
@@ -81,31 +81,31 @@ export default function InboundManagement({ showToast }) {
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-slate-50/50 border-b border-slate-100 text-xs uppercase tracking-wider text-slate-500 font-semibold">
-                                <th className="px-6 py-4">药品名称</th>
-                                <th className="px-6 py-4">供应商</th>
-                                <th className="px-6 py-4">入库数量</th>
-                                <th className="px-6 py-4">进货单价</th>
-                                <th className="px-6 py-4">入库时间</th>
+                                <th className="px-6 py-4 whitespace-nowrap">药品名称</th>
+                                <th className="px-6 py-4 whitespace-nowrap">供应商</th>
+                                <th className="px-6 py-4 whitespace-nowrap">入库数量</th>
+                                <th className="px-6 py-4 whitespace-nowrap">进货单价</th>
+                                <th className="px-6 py-4 whitespace-nowrap">入库时间</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50 text-sm">
                             {inbounds.map((item) => (
                                 <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                                    <td className="px-6 py-4 font-medium text-slate-700">
+                                    <td className="px-6 py-4 font-medium text-slate-700 whitespace-nowrap">
                                         <div className="flex items-center">
                                             <Package size={16} className="mr-2 text-slate-400" />
                                             {item.medicine?.name || '未知药品'}
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 text-slate-600">
+                                    <td className="px-6 py-4 text-slate-600 whitespace-nowrap">
                                         <div className="flex items-center">
                                             <Truck size={14} className="mr-2 text-slate-300" />
                                             {item.supplier?.name || '未知供应商'}
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 text-emerald-600 font-medium">+{item.quantity}</td>
-                                    <td className="px-6 py-4 text-slate-700 font-mono">¥{item.price.toFixed(2)}</td>
-                                    <td className="px-6 py-4 text-slate-400 text-xs">
+                                    <td className="px-6 py-4 text-emerald-600 font-medium whitespace-nowrap">+{item.quantity}</td>
+                                    <td className="px-6 py-4 text-slate-700 font-mono whitespace-nowrap">¥{item.price.toFixed(2)}</td>
+                                    <td className="px-6 py-4 text-slate-400 text-xs whitespace-nowrap">
                                         {new Date(item.inbound_date).toLocaleString()}
                                     </td>
                                 </tr>

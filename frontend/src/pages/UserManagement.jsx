@@ -68,7 +68,7 @@ export default function UserManagement({ showToast }) {
     return (
         <div className="space-y-6">
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-                <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <h2 className="text-lg font-bold text-slate-800">员工管理</h2>
                     <button
                         onClick={() => {
@@ -76,7 +76,7 @@ export default function UserManagement({ showToast }) {
                             setFormData({ username: '', password: '', real_name: '', phone: '', role: 'staff' });
                             setIsModalOpen(true);
                         }}
-                        className="flex items-center px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium rounded-lg transition-colors shadow-lg shadow-slate-900/10"
+                        className="w-full sm:w-auto flex items-center justify-center px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium rounded-lg transition-colors shadow-lg shadow-slate-900/10"
                     >
                         <Plus size={16} className="mr-2" />
                         添加员工
@@ -87,28 +87,28 @@ export default function UserManagement({ showToast }) {
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-slate-50/50 border-b border-slate-100 text-xs uppercase tracking-wider text-slate-500 font-semibold">
-                                <th className="px-6 py-4">用户名</th>
-                                <th className="px-6 py-4">姓名</th>
-                                <th className="px-6 py-4">联系电话</th>
-                                <th className="px-6 py-4">角色</th>
-                                <th className="px-6 py-4">入职时间</th>
-                                <th className="px-6 py-4 text-right">操作</th>
+                                <th className="px-6 py-4 whitespace-nowrap">用户名</th>
+                                <th className="px-6 py-4 whitespace-nowrap">姓名</th>
+                                <th className="px-6 py-4 whitespace-nowrap">联系电话</th>
+                                <th className="px-6 py-4 whitespace-nowrap">角色</th>
+                                <th className="px-6 py-4 whitespace-nowrap">入职时间</th>
+                                <th className="px-6 py-4 text-right whitespace-nowrap">操作</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50 text-sm">
                             {users.map((user) => (
                                 <tr key={user.id} className="hover:bg-slate-50 transition-colors">
-                                    <td className="px-6 py-4 font-medium text-slate-700">{user.username}</td>
-                                    <td className="px-6 py-4 text-slate-600">{user.real_name || '-'}</td>
-                                    <td className="px-6 py-4 text-slate-500 font-mono">{user.phone || '-'}</td>
-                                    <td className="px-6 py-4">
+                                    <td className="px-6 py-4 font-medium text-slate-700 whitespace-nowrap">{user.username}</td>
+                                    <td className="px-6 py-4 text-slate-600 whitespace-nowrap">{user.real_name || '-'}</td>
+                                    <td className="px-6 py-4 text-slate-500 font-mono whitespace-nowrap">{user.phone || '-'}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
                                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
                                             {user.role === 'admin' ? <Shield size={12} className="mr-1" /> : <User size={12} className="mr-1" />}
                                             {user.role === 'admin' ? '管理员' : '员工'}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4 text-slate-400">{new Date(user.created_at).toLocaleDateString()}</td>
-                                    <td className="px-6 py-4 text-right space-x-2">
+                                    <td className="px-6 py-4 text-slate-400 whitespace-nowrap">{new Date(user.created_at).toLocaleDateString()}</td>
+                                    <td className="px-6 py-4 text-right space-x-2 whitespace-nowrap">
                                         <button onClick={() => handleEdit(user)} className="text-teal-600 hover:text-teal-800 font-medium text-xs">编辑</button>
                                         <button onClick={() => handleDelete(user.id)} className="text-red-500 hover:text-red-700 font-medium text-xs">删除</button>
                                     </td>

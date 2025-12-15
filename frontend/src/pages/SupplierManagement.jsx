@@ -60,7 +60,7 @@ export default function SupplierManagement({ showToast }) {
     return (
         <div className="space-y-6">
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-                <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <h2 className="text-lg font-bold text-slate-800">供应商管理</h2>
                     <button
                         onClick={() => {
@@ -68,7 +68,7 @@ export default function SupplierManagement({ showToast }) {
                             setFormData({ name: '', contact: '', phone: '' });
                             setIsModalOpen(true);
                         }}
-                        className="flex items-center px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium rounded-lg transition-colors shadow-lg shadow-slate-900/10"
+                        className="w-full sm:w-auto flex items-center justify-center px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium rounded-lg transition-colors shadow-lg shadow-slate-900/10"
                     >
                         <Plus size={16} className="mr-2" />
                         添加供应商
@@ -79,26 +79,26 @@ export default function SupplierManagement({ showToast }) {
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-slate-50/50 border-b border-slate-100 text-xs uppercase tracking-wider text-slate-500 font-semibold">
-                                <th className="px-6 py-4">供应商名称</th>
-                                <th className="px-6 py-4">联系人</th>
-                                <th className="px-6 py-4">联系电话</th>
-                                <th className="px-6 py-4">合作时间</th>
-                                <th className="px-6 py-4 text-right">操作</th>
+                                <th className="px-6 py-4 whitespace-nowrap">供应商名称</th>
+                                <th className="px-6 py-4 whitespace-nowrap">联系人</th>
+                                <th className="px-6 py-4 whitespace-nowrap">联系电话</th>
+                                <th className="px-6 py-4 whitespace-nowrap">合作时间</th>
+                                <th className="px-6 py-4 text-right whitespace-nowrap">操作</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50 text-sm">
                             {suppliers.map((item) => (
                                 <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                                    <td className="px-6 py-4 font-medium text-slate-700">
+                                    <td className="px-6 py-4 font-medium text-slate-700 whitespace-nowrap">
                                         <div className="flex items-center">
                                             <Truck size={16} className="mr-2 text-slate-400" />
                                             {item.name}
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 text-slate-600">{item.contact || '-'}</td>
-                                    <td className="px-6 py-4 text-slate-500 font-mono">{item.phone || '-'}</td>
-                                    <td className="px-6 py-4 text-slate-400">{new Date(item.created_at).toLocaleDateString()}</td>
-                                    <td className="px-6 py-4 text-right space-x-2">
+                                    <td className="px-6 py-4 text-slate-600 whitespace-nowrap">{item.contact || '-'}</td>
+                                    <td className="px-6 py-4 text-slate-500 font-mono whitespace-nowrap">{item.phone || '-'}</td>
+                                    <td className="px-6 py-4 text-slate-400 whitespace-nowrap">{new Date(item.created_at).toLocaleDateString()}</td>
+                                    <td className="px-6 py-4 text-right space-x-2 whitespace-nowrap">
                                         <button onClick={() => handleEdit(item)} className="text-teal-600 hover:text-teal-800 font-medium text-xs">编辑</button>
                                         <button onClick={() => handleDelete(item.id)} className="text-red-500 hover:text-red-700 font-medium text-xs">删除</button>
                                     </td>

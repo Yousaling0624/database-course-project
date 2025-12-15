@@ -19,6 +19,7 @@ func main() {
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
+		c.Writer.Header().Set("Content-Type", "application/json; charset=utf-8")
 
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
@@ -90,6 +91,13 @@ func main() {
 		apiGroup.GET("/search/users", api.SearchUsers)
 		apiGroup.GET("/search/customers", api.SearchCustomers)
 		apiGroup.GET("/search/suppliers", api.SearchSuppliers)
+
+		// Database Configuration (admin only)
+		apiGroup.GET("/system/database/status", api.GetDatabaseStatus)
+		apiGroup.GET("/system/database", api.GetDatabaseConfig)
+		apiGroup.POST("/system/database", api.UpdateDatabaseConfig)
+		apiGroup.POST("/system/database/test", api.TestDatabaseConfig)
+
 	}
 
 	// Start Server
