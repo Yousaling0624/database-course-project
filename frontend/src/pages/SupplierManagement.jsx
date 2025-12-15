@@ -9,9 +9,11 @@ export default function SupplierManagement({ showToast }) {
     const [formData, setFormData] = useState({ name: '', contact: '', phone: '' });
     const [editingId, setEditingId] = useState(null);
 
-    const fetchSuppliers = async () => {
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const fetchSuppliers = async (keyword = '') => {
         try {
-            const data = await api.getSuppliers();
+            const data = await api.getSuppliers(keyword);
             setSuppliers(data);
         } catch (err) {
             if (showToast) showToast('获取供应商列表失败', 'error');
@@ -19,8 +21,12 @@ export default function SupplierManagement({ showToast }) {
     };
 
     useEffect(() => {
-        fetchSuppliers();
-    }, []);
+        // Debounce search
+        const timer = setTimeout(() => {
+            fetchSuppliers(searchTerm);
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
 
     const handleSubmit = async () => {
         try {
@@ -34,7 +40,7 @@ export default function SupplierManagement({ showToast }) {
             setIsModalOpen(false);
             setFormData({ name: '', contact: '', phone: '' });
             setEditingId(null);
-            fetchSuppliers();
+            fetchSuppliers(searchTerm);
         } catch (err) {
             if (showToast) showToast(editingId ? '更新失败' : '添加失败', 'error');
         }
@@ -51,7 +57,7 @@ export default function SupplierManagement({ showToast }) {
         try {
             await api.deleteSupplier(id);
             if (showToast) showToast('供应商删除成功');
-            fetchSuppliers();
+            fetchSuppliers(searchTerm);
         } catch (err) {
             if (showToast) showToast('删除失败', 'error');
         }
@@ -62,17 +68,31 @@ export default function SupplierManagement({ showToast }) {
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
                 <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <h2 className="text-lg font-bold text-slate-800">供应商管理</h2>
-                    <button
-                        onClick={() => {
-                            setEditingId(null);
-                            setFormData({ name: '', contact: '', phone: '' });
-                            setIsModalOpen(true);
-                        }}
-                        className="w-full sm:w-auto flex items-center justify-center px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium rounded-lg transition-colors shadow-lg shadow-slate-900/10"
-                    >
-                        <Plus size={16} className="mr-2" />
-                        添加供应商
-                    </button>
+                    <div className="flex gap-2 w-full sm:w-auto">
+                        <div className="relative flex-1 sm:w-64">
+                            <input
+                                type="text"
+                                placeholder="搜索供应商/联系人..."
+                                className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                            <svg className="w-4 h-4 text-slate-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                        </div>
+                        <button
+                            onClick={() => {
+                                setEditingId(null);
+                                setFormData({ name: '', contact: '', phone: '' });
+                                setIsModalOpen(true);
+                            }}
+                            className="flex items-center justify-center px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium rounded-lg transition-colors shadow-lg shadow-slate-900/10 whitespace-nowrap"
+                        >
+                            <Plus size={16} className="mr-2" />
+                            添加供应商
+                        </button>
+                    </div>
                 </div>
 
                 <div className="overflow-x-auto">

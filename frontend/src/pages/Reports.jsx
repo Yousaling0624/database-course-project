@@ -224,8 +224,8 @@ export default function Reports({ showToast }) {
                                 {salesData.records?.map(sale => (
                                     <tr key={sale.id} className="hover:bg-slate-50">
                                         <td className="px-4 py-3 font-mono text-sm whitespace-nowrap">{sale.order_id}</td>
-                                        <td className="px-4 py-3 whitespace-nowrap">{sale.medicine?.name}</td>
-                                        <td className="px-4 py-3 whitespace-nowrap">{sale.customer?.name || '-'}</td>
+                                        <td className="px-4 py-3 whitespace-nowrap">{sale.medicine_name || sale.medicine?.name}</td>
+                                        <td className="px-4 py-3 whitespace-nowrap">{sale.customer_name || sale.customer?.name || '-'}</td>
                                         <td className="px-4 py-3 whitespace-nowrap">{sale.quantity}</td>
                                         <td className="px-4 py-3 text-green-600 whitespace-nowrap">¥{sale.total_price?.toFixed(2)}</td>
                                         <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{new Date(sale.sale_date).toLocaleDateString()}</td>
@@ -267,11 +267,11 @@ export default function Reports({ showToast }) {
                             <tbody className="divide-y divide-slate-100">
                                 {inboundData.records?.map(inb => (
                                     <tr key={inb.id} className="hover:bg-slate-50">
-                                        <td className="px-4 py-3 whitespace-nowrap">{inb.medicine?.name}</td>
-                                        <td className="px-4 py-3 whitespace-nowrap">{inb.supplier?.name || '-'}</td>
+                                        <td className="px-4 py-3 whitespace-nowrap">{inb.medicine_name || inb.medicine?.name}</td>
+                                        <td className="px-4 py-3 whitespace-nowrap">{inb.supplier_name || inb.supplier?.name || '-'}</td>
                                         <td className="px-4 py-3 whitespace-nowrap">{inb.quantity}</td>
                                         <td className="px-4 py-3 whitespace-nowrap">¥{inb.price?.toFixed(2)}</td>
-                                        <td className="px-4 py-3 text-blue-600 whitespace-nowrap">¥{(inb.price * inb.quantity).toFixed(2)}</td>
+                                        <td className="px-4 py-3 text-blue-600 whitespace-nowrap">¥{(inb.total_cost || inb.price * inb.quantity).toFixed(2)}</td>
                                         <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{new Date(inb.inbound_date).toLocaleDateString()}</td>
                                     </tr>
                                 ))}

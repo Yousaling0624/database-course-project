@@ -13,7 +13,7 @@ export default function Login({ onLogin, showToast }) {
 
         try {
             const response = await api.login({ username, password });
-            onLogin(response.user); // Pass user object with role
+            onLogin(response.user, response.token); // Pass user object and token
             if (showToast) showToast(`欢迎回来，${response.user?.real_name || response.user?.username || '用户'}`, 'success');
         } catch (err) {
             if (showToast) showToast('登录失败，请检查账号密码', 'error');

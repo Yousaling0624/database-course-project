@@ -13,9 +13,17 @@ export default function Sales({ showToast }) {
 
     const [formData, setFormData] = useState({ medicine_id: '', customer_id: '', quantity: '' });
 
-    const fetchSales = async () => {
+    const [searchTerm, setSearchTerm] = useState('');
+    const [showPrescriptionOnly, setShowPrescriptionOnly] = useState(false);
+
+    const fetchSales = async (keyword = '', type = '') => {
         try {
-            const data = await api.getSales();
+            // If type logic is needed (e.g. only passing '处方药' when checkbox checked)
+            const typeFilter = showPrescriptionOnly ? '处方药' : '';
+            // Allow overriding if needed, otherwise use state
+            const finalType = type || typeFilter;
+
+            const data = await api.getSales(keyword, finalType);
             setSales(data);
         } catch (err) {
             if (showToast) showToast('获取销售记录失败', 'error');
@@ -24,7 +32,7 @@ export default function Sales({ showToast }) {
 
     const fetchSelections = async () => {
         try {
-            const [meds, custs] = await Promise.all([api.getMedicines(''), api.getCustomers()]);
+            const [meds, custs] = await Promise.all([api.getMedicines(''), api.getCustomers('')]);
             setMedicines(meds);
             setCustomers(custs);
         } catch (err) {
@@ -33,8 +41,13 @@ export default function Sales({ showToast }) {
     }
 
     useEffect(() => {
-        fetchSales();
-    }, []);
+        // Debounce search
+        const timer = setTimeout(() => {
+            const typeFilter = showPrescriptionOnly ? '处方药' : '';
+            fetchSales(searchTerm, typeFilter);
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [searchTerm, showPrescriptionOnly]);
 
     const handleOpenModal = () => {
         fetchSelections();
@@ -56,7 +69,7 @@ export default function Sales({ showToast }) {
             if (showToast) showToast('销售登记成功');
             setIsModalOpen(false);
             setFormData({ medicine_id: '', customer_id: '', quantity: '' });
-            fetchSales();
+            fetchSales(searchTerm);
         } catch (err) {
             console.error(err);
             if (showToast) showToast('销售失败: ' + (err.response?.data?.error || '库存不足或未知错误'), 'error');
@@ -68,13 +81,39 @@ export default function Sales({ showToast }) {
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
                 <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <h2 className="text-lg font-bold text-slate-800">销售订单</h2>
-                    <button
-                        onClick={handleOpenModal}
-                        className="w-full sm:w-auto flex items-center justify-center px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium rounded-lg transition-colors shadow-lg shadow-slate-900/10"
-                    >
-                        <Plus size={16} className="mr-2" />
-                        新建订单
-                    </button>
+                    <div className="flex gap-2 w-full sm:w-auto">
+                        <div className="relative flex-1 sm:w-64">
+                            <input
+                                type="text"
+                                placeholder="搜索订单号/药品/客户..."
+                                className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                            <svg className="w-4 h-4 text-slate-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                        </div>
+                        <div className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200">
+                            <input
+                                type="checkbox"
+                                id="prescriptionOnly"
+                                checked={showPrescriptionOnly}
+                                onChange={(e) => setShowPrescriptionOnly(e.target.checked)}
+                                className="w-4 h-4 text-teal-600 rounded focus:ring-teal-500"
+                            />
+                            <label htmlFor="prescriptionOnly" className="text-sm text-slate-600 select-none cursor-pointer">
+                                只看处方药
+                            </label>
+                        </div>
+                        <button
+                            onClick={handleOpenModal}
+                            className="flex items-center justify-center px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium rounded-lg transition-colors shadow-lg shadow-slate-900/10 whitespace-nowrap"
+                        >
+                            <Plus size={16} className="mr-2" />
+                            新建订单
+                        </button>
+                    </div>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -94,12 +133,22 @@ export default function Sales({ showToast }) {
                                 <tr key={item.id} className="hover:bg-slate-50 transition-colors">
                                     <td className="px-6 py-4 text-slate-500 font-mono whitespace-nowrap">{item.order_id}</td>
                                     <td className="px-6 py-4 font-medium text-slate-700 whitespace-nowrap">
-                                        {item.medicine?.name || '未知药品'}
+                                        <div className="flex items-center gap-2">
+                                            {item.medicine_name || item.medicine?.name || '未知药品'}
+                                            {item.medicine_type && (
+                                                <span className={`px-2 py-0.5 rounded text-xs border ${item.medicine_type === '处方药'
+                                                    ? 'bg-red-50 text-red-600 border-red-100'
+                                                    : 'bg-green-50 text-green-600 border-green-100'
+                                                    }`}>
+                                                    {item.medicine_type}
+                                                </span>
+                                            )}
+                                        </div>
                                     </td>
                                     <td className="px-6 py-4 text-slate-600 whitespace-nowrap">
                                         <div className="flex items-center">
                                             <User size={14} className="mr-2 text-slate-300" />
-                                            {item.customer?.name || '未知客户'}
+                                            {item.customer_name || item.customer?.name || '未知客户'}
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 text-blue-600 font-medium whitespace-nowrap">{item.quantity}</td>

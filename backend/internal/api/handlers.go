@@ -14,6 +14,20 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// Search Response Structs
+type SearchSalesRecord struct {
+	model.Sales
+	MedicineName string `json:"medicine_name"`
+	MedicineType string `json:"medicine_type"`
+	CustomerName string `json:"customer_name"`
+}
+
+type SearchInboundRecord struct {
+	model.Inbound
+	MedicineName string `json:"medicine_name"`
+	SupplierName string `json:"supplier_name"`
+}
+
 // Auth
 func Login(c *gin.Context) {
 	var req struct {
@@ -75,8 +89,23 @@ func CreateUser(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	// Password hashing
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	user.Password = string(hashedPassword)
+
+	// Auto-handle duplicate usernames
+	originalUsername := user.Username
+	suffix := 1
+	for {
+		var count int64
+		database.DB.Model(&model.User{}).Where("username = ?", user.Username).Count(&count)
+		if count == 0 {
+			break
+		}
+		user.Username = fmt.Sprintf("%s%d", originalUsername, suffix)
+		suffix++
+	}
 
 	if err := database.DB.Create(&user).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -123,15 +152,15 @@ func DeleteUser(c *gin.Context) {
 
 // ==================== Medicines ====================
 func GetMedicines(c *gin.Context) {
-	var meds []model.Medicine
+	meds := make([]model.Medicine, 0)
 	search := c.Query("search")
 
-	query := database.DB.Model(&model.Medicine{})
-	if search != "" {
-		query = query.Where("name LIKE ? OR code LIKE ?", "%"+search+"%", "%"+search+"%")
+	// Use Stored Procedure for fuzzy search (matches name, code, or manufacturer)
+	if err := database.DB.Raw("CALL sp_search_medicines(?)", search).Scan(&meds).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
 
-	query.Find(&meds)
 	c.JSON(http.StatusOK, meds)
 }
 
@@ -179,11 +208,14 @@ func DeleteMedicine(c *gin.Context) {
 
 // ==================== Customers ====================
 func GetCustomers(c *gin.Context) {
-	var customers []model.Customer
-	database.DB.Find(&customers)
+	keyword := c.Query("keyword")
+	customers := make([]model.Customer, 0)
+	if err := database.DB.Raw("CALL sp_search_customers(?)", keyword).Scan(&customers).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, customers)
 }
-
 func CreateCustomer(c *gin.Context) {
 	var customer model.Customer
 	if err := c.ShouldBindJSON(&customer); err != nil {
@@ -226,8 +258,12 @@ func DeleteCustomer(c *gin.Context) {
 
 // ==================== Suppliers ====================
 func GetSuppliers(c *gin.Context) {
-	var suppliers []model.Supplier
-	database.DB.Find(&suppliers)
+	keyword := c.Query("keyword")
+	suppliers := make([]model.Supplier, 0)
+	if err := database.DB.Raw("CALL sp_search_suppliers(?)", keyword).Scan(&suppliers).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, suppliers)
 }
 
@@ -273,8 +309,12 @@ func DeleteSupplier(c *gin.Context) {
 
 // ==================== Inbounds ====================
 func GetInbounds(c *gin.Context) {
-	var inbounds []model.Inbound
-	database.DB.Preload("Medicine").Preload("Supplier").Find(&inbounds)
+	keyword := c.Query("keyword")
+	inbounds := make([]SearchInboundRecord, 0)
+	if err := database.DB.Raw("CALL sp_search_inbounds(?)", keyword).Scan(&inbounds).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, inbounds)
 }
 
@@ -299,12 +339,7 @@ func CreateInbound(c *gin.Context) {
 		return
 	}
 
-	med.Stock += req.Quantity
-	if err := tx.Save(&med).Error; err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update stock"})
-		return
-	}
+	// Stock update is now handled by database trigger tr_after_inbound_insert
 
 	inbound := model.Inbound{
 		MedicineID:  req.MedicineID,
@@ -325,8 +360,14 @@ func CreateInbound(c *gin.Context) {
 
 // ==================== Sales ====================
 func GetSales(c *gin.Context) {
-	var sales []model.Sales
-	database.DB.Preload("Medicine").Preload("Customer").Find(&sales)
+	keyword := c.Query("keyword")
+	filterType := c.Query("type") // e.g. "处方药"
+	sales := make([]SearchSalesRecord, 0)
+	// Pass both keyword and filterType to SP
+	if err := database.DB.Raw("CALL sp_search_sales(?, ?)", keyword, filterType).Scan(&sales).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, sales)
 }
 
@@ -350,18 +391,8 @@ func CreateSale(c *gin.Context) {
 		return
 	}
 
-	if med.Stock < req.Quantity {
-		tx.Rollback()
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Insufficient stock"})
-		return
-	}
-
-	med.Stock -= req.Quantity
-	if err := tx.Save(&med).Error; err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update stock"})
-		return
-	}
+	// Stock check and update is now handled by database triggers:
+	// tr_before_sale_check_stock (validation) and tr_after_sale_insert (update)
 
 	sale := model.Sales{
 		OrderID:    fmt.Sprintf("ORD-%d", time.Now().Unix()),
@@ -405,21 +436,38 @@ func GetInboundReport(c *gin.Context) {
 	startDate := c.Query("start_date")
 	endDate := c.Query("end_date")
 
-	var inbounds []model.Inbound
-	query := database.DB.Preload("Medicine").Preload("Supplier")
-
-	if startDate != "" && endDate != "" {
-		query = query.Where("inbound_date BETWEEN ? AND ?", startDate, endDate)
+	type InboundRecord struct {
+		ID           int64     `json:"id"`
+		MedicineName string    `json:"medicine_name"`
+		SupplierName string    `json:"supplier_name"`
+		Quantity     int       `json:"quantity"`
+		Price        float64   `json:"price"`
+		TotalCost    float64   `json:"total_cost"`
+		InboundDate  time.Time `json:"inbound_date"`
 	}
 
-	query.Order("inbound_date DESC").Find(&inbounds)
+	var inbounds = make([]InboundRecord, 0)
+
+	// Default date range if not provided (default to last 30 days or all time)
+	if startDate == "" {
+		startDate = "1970-01-01"
+	}
+	if endDate == "" {
+		endDate = "2099-12-31"
+	}
+
+	// Use Stored Procedure for reporting
+	if err := database.DB.Raw("CALL sp_inbound_report(?, ?)", startDate, endDate).Scan(&inbounds).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 
 	// Calculate totals
 	var totalQuantity int
 	var totalAmount float64
 	for _, inb := range inbounds {
 		totalQuantity += inb.Quantity
-		totalAmount += inb.Price * float64(inb.Quantity)
+		totalAmount += inb.TotalCost
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -463,14 +511,31 @@ func GetSalesReport(c *gin.Context) {
 	startDate := c.Query("start_date")
 	endDate := c.Query("end_date")
 
-	var sales []model.Sales
-	query := database.DB.Preload("Medicine").Preload("Customer")
-
-	if startDate != "" && endDate != "" {
-		query = query.Where("sale_date BETWEEN ? AND ?", startDate, endDate)
+	type SalesRecord struct {
+		ID           int64     `json:"id"`
+		OrderID      string    `json:"order_id"`
+		MedicineName string    `json:"medicine_name"`
+		CustomerName string    `json:"customer_name"`
+		Quantity     int       `json:"quantity"`
+		TotalPrice   float64   `json:"total_price"`
+		SaleDate     time.Time `json:"sale_date"`
 	}
 
-	query.Order("sale_date DESC").Find(&sales)
+	var sales = make([]SalesRecord, 0)
+
+	// Default date range if not provided
+	if startDate == "" {
+		startDate = "1970-01-01"
+	}
+	if endDate == "" {
+		endDate = "2099-12-31"
+	}
+
+	// Use Stored Procedure for reporting
+	if err := database.DB.Raw("CALL sp_sales_report(?, ?)", startDate, endDate).Scan(&sales).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 
 	var totalQuantity int
 	var totalAmount float64
@@ -490,65 +555,42 @@ func GetSalesReport(c *gin.Context) {
 func GetFinancialReport(c *gin.Context) {
 	reportType := c.Query("type") // "daily" or "monthly"
 
+	type FinancialStats struct {
+		PeriodType   string    `json:"period_type"`
+		PeriodStart  time.Time `json:"period_start"`
+		SalesIncome  float64   `json:"sales_income"`
+		PurchaseCost float64   `json:"purchase_cost"`
+		GrossProfit  float64   `json:"gross_profit"`
+	}
+
+	var stats FinancialStats
+	// Use Stored Procedure for financial stats
+	if err := database.DB.Raw("CALL sp_financial_stats(?)", reportType).Scan(&stats).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Helper for counts (SP doesn't include them)
 	now := time.Now()
 	var startDate time.Time
-
 	if reportType == "daily" {
 		startDate = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	} else {
 		startDate = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
 	}
 
-	// Sales income
-	var salesIncome float64
-	database.DB.Model(&model.Sales{}).Select("COALESCE(sum(total_price), 0)").Where("sale_date >= ?", startDate).Row().Scan(&salesIncome)
-
-	// Purchase cost (Total expenditure)
-	var purchaseCost float64
-	database.DB.Model(&model.Inbound{}).Select("COALESCE(sum(price * quantity), 0)").Where("inbound_date >= ?", startDate).Row().Scan(&purchaseCost)
-
-	// Calculate Cost of Goods Sold (COGS) based on sold items
-	var sales []model.Sales
-	database.DB.Where("sale_date >= ?", startDate).Find(&sales)
-
-	// Get average cost for each medicine
-	type Cost struct {
-		MedicineID int64
-		AvgCost    float64
-	}
-	var costs []Cost
-	// Using average inbound price as an approximation for cost price
-	database.DB.Model(&model.Inbound{}).
-		Select("medicine_id, AVG(price) as avg_cost").
-		Group("medicine_id").
-		Scan(&costs)
-
-	costMap := make(map[int64]float64)
-	for _, c := range costs {
-		costMap[c.MedicineID] = c.AvgCost
-	}
-
-	var totalCOGS float64
-	for _, s := range sales {
-		if cost, ok := costMap[s.MedicineID]; ok {
-			totalCOGS += float64(s.Quantity) * cost
-		}
-	}
-
-	// Sales count
 	var salesCount int64
 	database.DB.Model(&model.Sales{}).Where("sale_date >= ?", startDate).Count(&salesCount)
 
-	// Purchase count
 	var purchaseCount int64
 	database.DB.Model(&model.Inbound{}).Where("inbound_date >= ?", startDate).Count(&purchaseCount)
 
 	c.JSON(http.StatusOK, gin.H{
-		"report_type":    reportType,
-		"start_date":     startDate,
-		"sales_income":   salesIncome,
-		"purchase_cost":  purchaseCost,
-		"gross_profit":   salesIncome - totalCOGS, // Profit based on sales vs COGS
+		"report_type":    stats.PeriodType,
+		"start_date":     stats.PeriodStart,
+		"sales_income":   stats.SalesIncome,
+		"purchase_cost":  stats.PurchaseCost,
+		"gross_profit":   stats.GrossProfit,
 		"sales_count":    salesCount,
 		"purchase_count": purchaseCount,
 	})
@@ -576,20 +618,7 @@ func CreateSalesReturn(c *gin.Context) {
 		return
 	}
 
-	// Restore stock
-	var med model.Medicine
-	if err := tx.First(&med, sale.MedicineID).Error; err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Medicine not found"})
-		return
-	}
-
-	med.Stock += sale.Quantity
-	if err := tx.Save(&med).Error; err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to restore stock"})
-		return
-	}
+	// Stock restoration is now handled by database trigger tr_after_sale_delete
 
 	// Delete the sale record (or mark as returned)
 	if err := tx.Delete(&sale).Error; err != nil {
@@ -626,26 +655,7 @@ func CreatePurchaseReturn(c *gin.Context) {
 		return
 	}
 
-	// Reduce stock
-	var med model.Medicine
-	if err := tx.First(&med, inbound.MedicineID).Error; err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Medicine not found"})
-		return
-	}
-
-	if med.Stock < inbound.Quantity {
-		tx.Rollback()
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Insufficient stock for return"})
-		return
-	}
-
-	med.Stock -= inbound.Quantity
-	if err := tx.Save(&med).Error; err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update stock"})
-		return
-	}
+	// Stock reduction is now handled by database trigger tr_after_inbound_delete
 
 	// Delete the inbound record
 	if err := tx.Delete(&inbound).Error; err != nil {
@@ -827,17 +837,34 @@ func RestoreDatabase(c *gin.Context) {
 
 	tx := database.DB.Begin()
 
+	// Disable foreign key checks for the transaction
+	if err := tx.Exec("SET FOREIGN_KEY_CHECKS = 0").Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "无法禁用外键检查"})
+		return
+	}
+
 	for _, stmt := range statements {
 		stmt = strings.TrimSpace(stmt)
 		if stmt == "" || strings.HasPrefix(stmt, "--") {
 			continue
 		}
+
+		// Replace TRUNCATE with DELETE FROM to maintain transaction consistency
+		// (TRUNCATE performs implicit commit, breaking the transaction)
+		if strings.HasPrefix(strings.ToUpper(stmt), "TRUNCATE TABLE") {
+			stmt = strings.Replace(stmt, "TRUNCATE TABLE", "DELETE FROM", 1)
+		}
+
 		if err := tx.Exec(stmt).Error; err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("执行SQL失败: %s", err.Error())})
 			return
 		}
 	}
+
+	// Re-enable foreign key checks
+	tx.Exec("SET FOREIGN_KEY_CHECKS = 1")
 
 	tx.Commit()
 	c.JSON(http.StatusOK, gin.H{"message": "数据库恢复成功"})

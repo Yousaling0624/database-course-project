@@ -19,23 +19,23 @@ export const updateMedicine = (id, data) => request.put(`/medicines/${id}`, data
 export const deleteMedicine = (id) => request.delete(`/medicines/${id}`);
 
 // Customers
-export const getCustomers = () => request.get('/customers');
+export const getCustomers = (keyword) => request.get('/customers', { params: { keyword } });
 export const createCustomer = (data) => request.post('/customers', data);
 export const updateCustomer = (id, data) => request.put(`/customers/${id}`, data);
 export const deleteCustomer = (id) => request.delete(`/customers/${id}`);
 
 // Suppliers
-export const getSuppliers = () => request.get('/suppliers');
+export const getSuppliers = (keyword) => request.get('/suppliers', { params: { keyword } });
 export const createSupplier = (data) => request.post('/suppliers', data);
 export const updateSupplier = (id, data) => request.put(`/suppliers/${id}`, data);
 export const deleteSupplier = (id) => request.delete(`/suppliers/${id}`);
 
 // Inbound
-export const getInbounds = () => request.get('/inbounds');
+export const getInbounds = (keyword) => request.get('/inbounds', { params: { keyword } });
 export const createInbound = (data) => request.post('/inbounds', data);
 
 // Sales
-export const getSales = () => request.get('/sales');
+export const getSales = (keyword, type) => request.get('/sales', { params: { keyword, type } });
 export const createSale = (data) => request.post('/sales', data);
 
 // Reports

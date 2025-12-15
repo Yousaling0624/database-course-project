@@ -25,8 +25,15 @@ function ProtectedRoute({ children, allowedRoles, userRole, showToast }) {
 }
 
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
+  // Initialize state from localStorage
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    return localStorage.getItem('isLoggedIn') === 'true';
+  });
+  const [currentUser, setCurrentUser] = useState(() => {
+    const user = localStorage.getItem('currentUser');
+    return user ? JSON.parse(user) : null;
+  });
+
   const [toast, setToast] = useState(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -34,14 +41,21 @@ function App() {
     setToast({ message, type });
   };
 
-  const handleLogin = (user) => {
+  const handleLogin = (user, token) => {
     setCurrentUser(user);
     setIsLoggedIn(true);
+    // Persist to localStorage
+    localStorage.setItem('isLoggedIn', 'true');
+    localStorage.setItem('currentUser', JSON.stringify(user));
+    if (token) localStorage.setItem('token', token);
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
     setIsLoggedIn(false);
+    localStorage.removeItem('isLoggedIn');
+    localStorage.removeItem('currentUser');
+    localStorage.removeItem('token'); // Clear token too
   };
 
   if (!isLoggedIn) {
