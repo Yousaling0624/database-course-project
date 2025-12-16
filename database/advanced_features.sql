@@ -77,6 +77,7 @@ ORDER BY sale_day DESC;
 -- ==================== STORED PROCEDURES ====================
 
 -- 存储过程：模糊查询药品
+DROP PROCEDURE IF EXISTS sp_search_medicines;
 DELIMITER //
 CREATE PROCEDURE sp_search_medicines(IN keyword VARCHAR(100))
 BEGIN
@@ -88,6 +89,7 @@ END //
 DELIMITER ;
 
 -- 存储过程：获取库存不足的药品
+DROP PROCEDURE IF EXISTS sp_get_low_stock;
 DELIMITER //
 CREATE PROCEDURE sp_get_low_stock(IN threshold INT)
 BEGIN
@@ -160,6 +162,7 @@ END //
 DELIMITER ;
 
 -- 存储过程：获取某时间段的销售报表
+DROP PROCEDURE IF EXISTS sp_sales_report;
 DELIMITER //
 CREATE PROCEDURE sp_sales_report(IN start_date DATE, IN end_date DATE)
 BEGIN
@@ -180,6 +183,7 @@ END //
 DELIMITER ;
 
 -- 存储过程：获取某时间段的入库报表
+DROP PROCEDURE IF EXISTS sp_inbound_report;
 DELIMITER //
 CREATE PROCEDURE sp_inbound_report(IN start_date DATE, IN end_date DATE)
 BEGIN
@@ -200,6 +204,7 @@ END //
 DELIMITER ;
 
 -- 存储过程：计算财务统计
+DROP PROCEDURE IF EXISTS sp_financial_stats;
 DELIMITER //
 CREATE PROCEDURE sp_financial_stats(IN report_type VARCHAR(10))
 BEGIN
@@ -234,6 +239,7 @@ DELIMITER ;
 -- ==================== TRIGGERS ====================
 
 -- 触发器：销售后自动更新库存（减少）
+DROP TRIGGER IF EXISTS tr_after_sale_insert;
 DELIMITER //
 CREATE TRIGGER tr_after_sale_insert
 AFTER INSERT ON sales
@@ -246,6 +252,7 @@ END //
 DELIMITER ;
 
 -- 触发器：入库后自动更新库存（增加）
+DROP TRIGGER IF EXISTS tr_after_inbound_insert;
 DELIMITER //
 CREATE TRIGGER tr_after_inbound_insert
 AFTER INSERT ON inbounds
@@ -258,6 +265,7 @@ END //
 DELIMITER ;
 
 -- 触发器：删除销售记录时恢复库存
+DROP TRIGGER IF EXISTS tr_after_sale_delete;
 DELIMITER //
 CREATE TRIGGER tr_after_sale_delete
 AFTER DELETE ON sales
@@ -270,6 +278,7 @@ END //
 DELIMITER ;
 
 -- 触发器：删除入库记录时减少库存
+DROP TRIGGER IF EXISTS tr_after_inbound_delete;
 DELIMITER //
 CREATE TRIGGER tr_after_inbound_delete
 AFTER DELETE ON inbounds
@@ -282,6 +291,7 @@ END //
 DELIMITER ;
 
 -- 触发器：防止库存变为负数
+DROP TRIGGER IF EXISTS tr_before_sale_check_stock;
 DELIMITER //
 CREATE TRIGGER tr_before_sale_check_stock
 BEFORE INSERT ON sales
@@ -298,6 +308,7 @@ DELIMITER ;
 -- ==================== FUNCTIONS ====================
 
 -- 函数：计算药品库存价值
+DROP FUNCTION IF EXISTS fn_medicine_stock_value;
 DELIMITER //
 CREATE FUNCTION fn_medicine_stock_value(med_id INT) 
 RETURNS DECIMAL(10, 2)
@@ -310,6 +321,7 @@ END //
 DELIMITER ;
 
 -- 函数：获取客户总消费金额
+DROP FUNCTION IF EXISTS fn_customer_total_spent;
 DELIMITER //
 CREATE FUNCTION fn_customer_total_spent(cust_id INT) 
 RETURNS DECIMAL(10, 2)
@@ -322,6 +334,7 @@ END //
 DELIMITER ;
 
 -- 函数：获取药品本月销售量
+DROP FUNCTION IF EXISTS fn_medicine_monthly_sales;
 DELIMITER //
 CREATE FUNCTION fn_medicine_monthly_sales(med_id INT) 
 RETURNS INT

@@ -422,10 +422,31 @@ func GetStats(c *gin.Context) {
 	database.DB.Model(&model.Sales{}).Select("COALESCE(sum(total_price), 0)").Where("sale_date > ?", time.Now().AddDate(0, -1, 0)).Row().Scan(&totalSales)
 	database.DB.Model(&model.Medicine{}).Where("stock < ?", 50).Count(&lowStockCount)
 
+	// Top Selling
+	type TopSellingItem struct {
+		Name         string  `json:"name"`
+		TotalSold    int     `json:"total_sold"`
+		TotalRevenue float64 `json:"total_revenue"`
+	}
+	var topSelling []TopSellingItem
+	database.DB.Raw("CALL sp_top_selling_medicines(?)", 5).Scan(&topSelling)
+
+	// Sales Trend (Last 7 Days)
+	type SalesTrendItem struct {
+		SaleDay      string  `json:"sale_day"`
+		TotalRevenue float64 `json:"total_revenue"`
+	}
+	var salesTrend []SalesTrendItem
+	endDate := time.Now()
+	startDate := endDate.AddDate(0, 0, -6)
+	database.DB.Raw("CALL sp_sales_trend(?, ?)", startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).Scan(&salesTrend)
+
 	c.JSON(http.StatusOK, gin.H{
 		"total_stock": totalStock,
 		"month_sales": totalSales,
 		"low_stock":   lowStockCount,
+		"top_selling": topSelling,
+		"sales_trend": salesTrend,
 	})
 }
 
@@ -832,17 +853,34 @@ func RestoreDatabase(c *gin.Context) {
 		return
 	}
 
-	// Split SQL into statements
-	statements := strings.Split(sqlStr, ";")
+	// Use raw SQL connection to ensure session variables (FOREIGN_KEY_CHECKS) persist
+	// GORM's transaction might pick different connections if not careful, though tx usually binds.
+	// But TRUNCATE is DDL and commits transaction in MySQL. So we shouldn't use a transaction for the whole if we use TRUNCATE.
+	// Instead, we execute statements sequentially on a single connection.
 
-	tx := database.DB.Begin()
+	sqlDB, err := database.DB.DB()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "数据库连接错误"})
+		return
+	}
 
-	// Disable foreign key checks for the transaction
-	if err := tx.Exec("SET FOREIGN_KEY_CHECKS = 0").Error; err != nil {
-		tx.Rollback()
+	// Acquire a dedicated connection for the session
+	conn, err := sqlDB.Conn(c)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取数据库连接失败"})
+		return
+	}
+	defer conn.Close()
+
+	// Disable foreign key checks
+	if _, err := conn.ExecContext(c, "SET FOREIGN_KEY_CHECKS = 0"); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "无法禁用外键检查"})
 		return
 	}
+	defer conn.ExecContext(c, "SET FOREIGN_KEY_CHECKS = 1")
+
+	// Split SQL into statements
+	statements := strings.Split(sqlStr, ";")
 
 	for _, stmt := range statements {
 		stmt = strings.TrimSpace(stmt)
@@ -850,23 +888,16 @@ func RestoreDatabase(c *gin.Context) {
 			continue
 		}
 
-		// Replace TRUNCATE with DELETE FROM to maintain transaction consistency
-		// (TRUNCATE performs implicit commit, breaking the transaction)
-		if strings.HasPrefix(strings.ToUpper(stmt), "TRUNCATE TABLE") {
-			stmt = strings.Replace(stmt, "TRUNCATE TABLE", "DELETE FROM", 1)
-		}
-
-		if err := tx.Exec(stmt).Error; err != nil {
-			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("执行SQL失败: %s", err.Error())})
+		// TRUNCATE is fine here since we are not in a GORM transaction wrapper that expects rollback.
+		if _, err := conn.ExecContext(c, stmt); err != nil {
+			// Don't stop immediately if it's just a warning, but for errors we returns
+			// However, dropping/truncating might fail if locked?
+			// We just return error.
+			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("执行SQL失败: %s\n%v", stmt, err)})
 			return
 		}
 	}
 
-	// Re-enable foreign key checks
-	tx.Exec("SET FOREIGN_KEY_CHECKS = 1")
-
-	tx.Commit()
 	c.JSON(http.StatusOK, gin.H{"message": "数据库恢复成功"})
 }
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, MoreHorizontal } from 'lucide-react';
+import { Search, Plus, MoreHorizontal, Pill } from 'lucide-react';
 import * as api from '../api';
 import Modal from '../components/Modal';
 
@@ -77,18 +77,20 @@ export default function Inventory({ showToast }) {
     }
 
     return (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col card-hover">
             {/* 工具栏 */}
-            {/* 工具栏 */}
-            <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <h2 className="text-lg font-bold text-slate-800">库存明细</h2>
-                <div className="flex flex-col sm:flex-row gap-3">
-                    <div className="relative w-full sm:w-auto">
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/30">
+                <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <Pill size={20} className="text-teal-600" />
+                    库存明细
+                </h2>
+                <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                    <div className="relative w-full sm:w-auto flex-1 sm:min-w-[250px]">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                         <input
                             type="text"
                             placeholder="搜索药品名称/编号..."
-                            className="w-full sm:w-64 pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all"
+                            className="input-field pl-10"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                         />
@@ -99,7 +101,7 @@ export default function Inventory({ showToast }) {
                             setFormData({ name: '', code: '', price: '', stock: '', spec: '', manufacturer: '' });
                             setIsModalOpen(true);
                         }}
-                        className="w-full sm:w-auto flex items-center justify-center px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium rounded-lg transition-colors shadow-lg shadow-slate-900/10"
+                        className="btn-primary flex items-center justify-center whitespace-nowrap w-full sm:w-auto"
                     >
                         <Plus size={16} className="mr-2" />
                         新建药品

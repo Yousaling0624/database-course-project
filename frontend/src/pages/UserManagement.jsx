@@ -67,16 +67,19 @@ export default function UserManagement({ showToast }) {
 
     return (
         <div className="space-y-6">
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-                <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <h2 className="text-lg font-bold text-slate-800">员工管理</h2>
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col card-hover">
+                <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/30">
+                    <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                        <User size={20} className="text-teal-600" />
+                        员工管理
+                    </h2>
                     <button
                         onClick={() => {
                             setEditingId(null);
                             setFormData({ username: '', password: '', real_name: '', phone: '', role: 'staff' });
                             setIsModalOpen(true);
                         }}
-                        className="w-full sm:w-auto flex items-center justify-center px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium rounded-lg transition-colors shadow-lg shadow-slate-900/10"
+                        className="btn-primary flex items-center justify-center whitespace-nowrap"
                     >
                         <Plus size={16} className="mr-2" />
                         添加员工

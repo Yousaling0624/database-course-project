@@ -7,8 +7,8 @@ services:
       MYSQL_DATABASE: pharma_db
       MYSQL_USER: user
       MYSQL_PASSWORD: password
-    # ports:
-    #   - "127.0.0.1:33306:3306"
+    ports:
+      - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       # - ./backend/internal/database/init.sql:/docker-entrypoint-initdb.d/init.sql # Disable init.sql to rely on GORM AutoMigrate
@@ -33,7 +33,8 @@ services:
     build: ./frontend
     container_name: pharmacy_frontend
     environment:
-      VITE_API_URL: http://backend:8080
+      # VITE_API_URL: http://backend:8080 # Un-comment for full docker-compose mode
+      VITE_API_URL: http://172.17.0.1:8080 # For local backend dev (Linux Docker host IP)
     ports:
       - "5173:5173"
     volumes:

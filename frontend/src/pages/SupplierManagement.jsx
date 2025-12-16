@@ -65,15 +65,18 @@ export default function SupplierManagement({ showToast }) {
 
     return (
         <div className="space-y-6">
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-                <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <h2 className="text-lg font-bold text-slate-800">供应商管理</h2>
-                    <div className="flex gap-2 w-full sm:w-auto">
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col card-hover">
+                <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/30">
+                    <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                        <Truck size={20} className="text-teal-600" />
+                        供应商管理
+                    </h2>
+                    <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                         <div className="relative flex-1 sm:w-64">
                             <input
                                 type="text"
                                 placeholder="搜索供应商/联系人..."
-                                className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                                className="input-field pl-10"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
@@ -87,7 +90,7 @@ export default function SupplierManagement({ showToast }) {
                                 setFormData({ name: '', contact: '', phone: '' });
                                 setIsModalOpen(true);
                             }}
-                            className="flex items-center justify-center px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium rounded-lg transition-colors shadow-lg shadow-slate-900/10 whitespace-nowrap"
+                            className="btn-primary flex items-center justify-center whitespace-nowrap"
                         >
                             <Plus size={16} className="mr-2" />
                             添加供应商

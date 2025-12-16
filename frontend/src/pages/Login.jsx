@@ -41,7 +41,7 @@ export default function Login({ onLogin, showToast }) {
                         <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">工作账号</label>
                         <input
                             type="text"
-                            className="w-full px-4 py-3 rounded-lg bg-slate-50 border border-slate-200 text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all placeholder:text-slate-400"
+                            className="input-field"
                             placeholder="请输入您的账号"
                         />
                     </div>
@@ -49,14 +49,14 @@ export default function Login({ onLogin, showToast }) {
                         <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">密码</label>
                         <input
                             type="password"
-                            className="w-full px-4 py-3 rounded-lg bg-slate-50 border border-slate-200 text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all placeholder:text-slate-400"
+                            className="input-field"
                             placeholder="请输入密码"
                         />
                     </div>
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full bg-slate-900 hover:bg-slate-800 text-white font-medium py-3 rounded-lg transition-all duration-200 flex items-center justify-center shadow-lg shadow-slate-900/20"
+                        className="w-full btn-primary flex items-center justify-center py-3 text-base shadow-xl shadow-teal-600/30"
                     >
                         {loading ? (
                             <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
