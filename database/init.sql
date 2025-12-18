@@ -1,8 +1,8 @@
--- Init Database
+-- 初始化数据库
 CREATE DATABASE IF NOT EXISTS pharmacy_db;
 USE pharmacy_db;
 
--- Users (Employees)
+-- 用户表（员工）
 CREATE TABLE IF NOT EXISTS users (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) NOT NULL UNIQUE,
@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
--- Medicines
+-- 药品表
 CREATE TABLE IF NOT EXISTS medicines (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     code VARCHAR(50) NOT NULL UNIQUE,
@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS medicines (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
--- Customers
+-- 客户表
 CREATE TABLE IF NOT EXISTS customers (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS customers (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Suppliers
+-- 供应商表
 CREATE TABLE IF NOT EXISTS suppliers (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS suppliers (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Inbound (Purchase) Records
+-- 入库记录（采购）
 CREATE TABLE IF NOT EXISTS inbounds (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     medicine_id BIGINT NOT NULL,
@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS inbounds (
     FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
 );
 
--- Sales Records
+-- 销售记录
 CREATE TABLE IF NOT EXISTS sales (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     order_id VARCHAR(50) NOT NULL,
@@ -69,6 +69,6 @@ CREATE TABLE IF NOT EXISTS sales (
     FOREIGN KEY (customer_id) REFERENCES customers(id)
 );
 
--- Insert Default Admin
+-- 插入默认管理员
 INSERT IGNORE INTO users (username, password, role) VALUES ('admin', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'admin');
--- Password is 'password' (bcrypt hash)
+-- 密码是 'password' (bcrypt 哈希)

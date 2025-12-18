@@ -1,7 +1,7 @@
--- Pharmaceutical Sales Management System - Advanced Database Features
--- Triggers, Stored Procedures, and Views
+-- 医药销售管理系统 - 高级数据库特性
+-- 触发器、存储过程和视图
 
--- ==================== VIEWS ====================
+-- ==================== 视图 ====================
 
 -- 药品库存视图：显示药品详细信息和库存状态
 CREATE OR REPLACE VIEW v_medicine_inventory AS
@@ -74,7 +74,7 @@ FROM sales
 GROUP BY DATE(sale_date)
 ORDER BY sale_day DESC;
 
--- ==================== STORED PROCEDURES ====================
+-- ==================== 存储过程 ====================
 
 -- 存储过程：模糊查询药品
 DROP PROCEDURE IF EXISTS sp_search_medicines;
@@ -236,7 +236,7 @@ BEGIN
 END //
 DELIMITER ;
 
--- ==================== TRIGGERS ====================
+-- ==================== 触发器 ====================
 
 -- 触发器：销售后自动更新库存（减少）
 DROP TRIGGER IF EXISTS tr_after_sale_insert;
@@ -305,7 +305,7 @@ BEGIN
 END //
 DELIMITER ;
 
--- ==================== FUNCTIONS ====================
+-- ==================== 函数 ====================
 
 -- 函数：计算药品库存价值
 DROP FUNCTION IF EXISTS fn_medicine_stock_value;
@@ -350,7 +350,7 @@ BEGIN
 END //
 DELIMITER ;
 
--- ==================== ADDITIONAL VIEWS ====================
+-- ==================== 额外视图 ====================
 
 -- 普通员工药品视图（隐藏进货价）
 CREATE OR REPLACE VIEW v_staff_medicines AS
@@ -413,7 +413,7 @@ LEFT JOIN sales s ON c.id = s.customer_id
 GROUP BY c.id, c.name
 ORDER BY total_spent DESC;
 
--- ==================== ADDITIONAL STORED PROCEDURES ====================
+-- ==================== 额外存储过程 ====================
 
 -- 存储过程：按日期范围统计销售趋势
 DROP PROCEDURE IF EXISTS sp_sales_trend;
@@ -459,7 +459,7 @@ BEGIN
         CASE WHEN sort_column = 'total_sold' AND sort_order = 'ASC' THEN SUM(s.quantity) END ASC,
         CASE WHEN sort_column = 'total_revenue' AND sort_order = 'DESC' THEN SUM(s.total_price) END DESC,
         CASE WHEN sort_column = 'total_revenue' AND sort_order = 'ASC' THEN SUM(s.total_price) END ASC,
-        -- Default sort if none matches
+        -- 如果没有匹配项，则使用默认排序
         SUM(s.quantity) DESC
     LIMIT limit_count;
 END //
@@ -477,7 +477,7 @@ BEGIN
 END //
 DELIMITER ;
 
--- ==================== PERMISSIONS & ROLES ====================
+-- ==================== 权限与角色 ====================
 -- 注意：以下 SQL 语句用于课程设计报告展示。
 -- 在实际环境中需要 ROOT 权限执行，Docker 环境可能无法直接执行。
 
