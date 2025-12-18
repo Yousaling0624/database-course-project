@@ -98,6 +98,9 @@ func main() {
 		apiGroup.POST("/system/database", api.UpdateDatabaseConfig)
 		apiGroup.POST("/system/database/test", api.TestDatabaseConfig)
 
+		// Analysis
+		apiGroup.GET("/analysis/top-selling", api.GetTopSellingAnalysis)
+		apiGroup.GET("/analysis/trend", api.GetSalesTrendAnalysis)
 	}
 
 	// Start Server

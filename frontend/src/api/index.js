@@ -66,3 +66,7 @@ export const getDatabaseConfig = () => request.get('/system/database');
 export const updateDatabaseConfig = (data) => request.post('/system/database', data, { timeout: 30000 });
 export const testDatabaseConfig = (data) => request.post('/system/database/test', data, { timeout: 30000 });
 export const resetSampleData = () => request.post('/system/reset-sample-data', {}, { timeout: 60000 });
+
+// Analysis
+export const getTopSellingAnalysis = (startDate, endDate, sortBy = 'total_sold', orderBy = 'DESC', limit = 100) => request.get('/analysis/top-selling', { params: { start_date: startDate, end_date: endDate, sort_by: sortBy, order_by: orderBy, limit } });
+export const getSalesTrendAnalysis = (startDate, endDate) => request.get('/analysis/trend', { params: { start_date: startDate, end_date: endDate } });

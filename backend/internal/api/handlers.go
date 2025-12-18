@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -422,14 +423,16 @@ func GetStats(c *gin.Context) {
 	database.DB.Model(&model.Sales{}).Select("COALESCE(sum(total_price), 0)").Where("sale_date > ?", time.Now().AddDate(0, -1, 0)).Row().Scan(&totalSales)
 	database.DB.Model(&model.Medicine{}).Where("stock < ?", 50).Count(&lowStockCount)
 
-	// Top Selling
+	// Top Selling (Default last 30 days, sorted by quantity)
 	type TopSellingItem struct {
 		Name         string  `json:"name"`
 		TotalSold    int     `json:"total_sold"`
 		TotalRevenue float64 `json:"total_revenue"`
 	}
 	var topSelling []TopSellingItem
-	database.DB.Raw("CALL sp_top_selling_medicines(?)", 5).Scan(&topSelling)
+	startDate30 := time.Now().AddDate(0, 0, -29).Format("2006-01-02")
+	endDateNow := time.Now().Format("2006-01-02")
+	database.DB.Raw("CALL sp_top_selling_medicines(?, ?, ?, ?, ?)", startDate30, endDateNow, 5, "total_sold", "DESC").Scan(&topSelling)
 
 	// Sales Trend (Last 7 Days)
 	type SalesTrendItem struct {
@@ -448,6 +451,67 @@ func GetStats(c *gin.Context) {
 		"top_selling": topSelling,
 		"sales_trend": salesTrend,
 	})
+}
+
+// GetTopSellingAnalysis returns ranking data with optional date range, sorting and limit
+func GetTopSellingAnalysis(c *gin.Context) {
+	startDate := c.Query("start_date")
+	endDate := c.Query("end_date")
+	sortBy := c.DefaultQuery("sort_by", "total_sold")
+	orderBy := c.DefaultQuery("order_by", "DESC")
+	limitStr := c.DefaultQuery("limit", "100")
+	limit, _ := strconv.Atoi(limitStr)
+
+	// Default date range (last 30 days) if not provided
+	if startDate == "" {
+		startDate = time.Now().AddDate(0, 0, -29).Format("2006-01-02")
+	}
+	if endDate == "" {
+		endDate = time.Now().Format("2006-01-02")
+	}
+
+	type TopSellingItem struct {
+		ID           int64   `json:"id"`
+		Code         string  `json:"code"`
+		Name         string  `json:"name" gorm:"column:name"`
+		Type         string  `json:"type" gorm:"column:type"`
+		TotalSold    int     `json:"total_sold" gorm:"column:total_sold"`
+		TotalRevenue float64 `json:"total_revenue" gorm:"column:total_revenue"`
+	}
+	var topSelling []TopSellingItem
+	database.DB.Raw("CALL sp_top_selling_medicines(?, ?, ?, ?, ?)", startDate, endDate, limit, sortBy, orderBy).Scan(&topSelling)
+
+	c.JSON(http.StatusOK, topSelling)
+}
+
+// GetSalesTrendAnalysis returns trend data for a specified date range or number of days
+func GetSalesTrendAnalysis(c *gin.Context) {
+	startDate := c.Query("start_date")
+	endDate := c.Query("end_date")
+	daysStr := c.Query("days")
+
+	if startDate == "" || endDate == "" {
+		days := 30
+		if daysStr != "" {
+			days, _ = strconv.Atoi(daysStr)
+		}
+		end := time.Now()
+		start := end.AddDate(0, 0, -(days - 1))
+		startDate = start.Format("2006-01-02")
+		endDate = end.Format("2006-01-02")
+	}
+
+	type SalesTrendItem struct {
+		SaleDay       string  `json:"sale_day" gorm:"column:sale_day"`
+		OrderCount    int     `json:"order_count" gorm:"column:order_count"`
+		TotalQuantity int     `json:"total_quantity" gorm:"column:total_quantity"`
+		TotalRevenue  float64 `json:"total_revenue" gorm:"column:total_revenue"`
+	}
+	var salesTrend []SalesTrendItem
+
+	database.DB.Raw("CALL sp_sales_trend(?, ?)", startDate, endDate).Scan(&salesTrend)
+
+	c.JSON(http.StatusOK, salesTrend)
 }
 
 // ==================== Reports ====================
@@ -838,6 +902,25 @@ func escapeSQL(s string) string {
 	return strings.ReplaceAll(s, "'", "''")
 }
 
+// stripSQLComments removes SQL comments from a statement
+func stripSQLComments(stmt string) string {
+	lines := strings.Split(stmt, "\n")
+	var cleanLines []string
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		// Skip empty lines or lines that are entirely comments
+		if trimmed == "" || strings.HasPrefix(trimmed, "--") {
+			continue
+		}
+		// Remove trailing comments if any (simple implementation)
+		if idx := strings.Index(line, "--"); idx != -1 {
+			line = line[:idx]
+		}
+		cleanLines = append(cleanLines, line)
+	}
+	return strings.Join(cleanLines, "\n")
+}
+
 // RestoreDatabase imports data from SQL file content
 func RestoreDatabase(c *gin.Context) {
 	// Read SQL content from request body
@@ -883,16 +966,16 @@ func RestoreDatabase(c *gin.Context) {
 	statements := strings.Split(sqlStr, ";")
 
 	for _, stmt := range statements {
+		// Clean the statement by removing comments and whitespace
+		stmt = stripSQLComments(stmt)
 		stmt = strings.TrimSpace(stmt)
-		if stmt == "" || strings.HasPrefix(stmt, "--") {
+
+		if stmt == "" {
 			continue
 		}
 
-		// TRUNCATE is fine here since we are not in a GORM transaction wrapper that expects rollback.
+		// Execute the cleaned statement
 		if _, err := conn.ExecContext(c, stmt); err != nil {
-			// Don't stop immediately if it's just a warning, but for errors we returns
-			// However, dropping/truncating might fail if locked?
-			// We just return error.
 			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("执行SQL失败: %s\n%v", stmt, err)})
 			return
 		}

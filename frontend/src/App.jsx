@@ -13,6 +13,7 @@ import CustomerManagement from './pages/CustomerManagement';
 import SupplierManagement from './pages/SupplierManagement';
 import InboundManagement from './pages/InboundManagement';
 import Reports from './pages/Reports';
+import SalesAnalysis from './pages/SalesAnalysis';
 import SystemMaintenance from './pages/SystemMaintenance';
 
 // Role-based route protection component
@@ -104,6 +105,7 @@ function App() {
                 <Route path="/customers" element={<CustomerManagement showToast={showToast} />} />
                 <Route path="/suppliers" element={<SupplierManagement showToast={showToast} />} />
                 <Route path="/reports" element={<Reports showToast={showToast} />} />
+                <Route path="/analysis" element={<SalesAnalysis />} />
 
                 {/* Admin only - System Maintenance */}
                 <Route path="/system" element={

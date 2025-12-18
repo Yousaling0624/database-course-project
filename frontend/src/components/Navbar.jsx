@@ -14,9 +14,31 @@ export default function Navbar({ onMenuClick }) {
             case '/customers': return '客户管理'; // Shortened for mobile fit
             case '/suppliers': return '供应商管理';
             case '/reports': return '报表中心';
+            case '/analysis': return '销售深度分析';
             case '/system': return '系统维护';
             default: return '医药管理系统';
         }
+    };
+
+    const renderBreadcrumbs = () => {
+        const path = location.pathname;
+        if (path === '/') return <span className="text-slate-800 font-medium truncate">数据概览</span>;
+
+        if (path === '/analysis') {
+            return (
+                <>
+                    <span className="hover:text-slate-800 cursor-pointer">报表分析</span>
+                    <span className="mx-2 text-slate-300">/</span>
+                    <span className="text-slate-800 font-medium truncate">深度分析</span>
+                </>
+            );
+        }
+
+        return (
+            <span className="text-slate-800 font-medium truncate">
+                {getPageTitle()}
+            </span>
+        );
     };
 
     return (
@@ -31,9 +53,7 @@ export default function Navbar({ onMenuClick }) {
 
                 <span className="hover:text-slate-800 cursor-pointer hidden sm:inline">首页</span>
                 <span className="mx-2 text-slate-300 hidden sm:inline">/</span>
-                <span className="text-slate-800 font-medium truncate">
-                    {getPageTitle()}
-                </span>
+                {renderBreadcrumbs()}
             </div>
             <div className="flex items-center space-x-2 md:space-x-4">
                 <button className="relative p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors">

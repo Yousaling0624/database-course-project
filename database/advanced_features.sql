@@ -432,10 +432,16 @@ BEGIN
 END //
 DELIMITER ;
 
--- 存储过程：获取热销药品排行
+-- 存储过程：获取热销药品排行 (增加动态排序支持)
 DROP PROCEDURE IF EXISTS sp_top_selling_medicines;
 DELIMITER //
-CREATE PROCEDURE sp_top_selling_medicines(IN limit_count INT)
+CREATE PROCEDURE sp_top_selling_medicines(
+    IN start_date DATE, 
+    IN end_date DATE, 
+    IN limit_count INT,
+    IN sort_column VARCHAR(50),
+    IN sort_order VARCHAR(10)
+)
 BEGIN
     SELECT 
         m.id,
@@ -446,8 +452,15 @@ BEGIN
         SUM(s.total_price) AS total_revenue
     FROM medicines m
     JOIN sales s ON m.id = s.medicine_id
+    WHERE DATE(s.sale_date) BETWEEN start_date AND end_date
     GROUP BY m.id, m.code, m.name, m.type
-    ORDER BY total_sold DESC
+    ORDER BY 
+        CASE WHEN sort_column = 'total_sold' AND sort_order = 'DESC' THEN SUM(s.quantity) END DESC,
+        CASE WHEN sort_column = 'total_sold' AND sort_order = 'ASC' THEN SUM(s.quantity) END ASC,
+        CASE WHEN sort_column = 'total_revenue' AND sort_order = 'DESC' THEN SUM(s.total_price) END DESC,
+        CASE WHEN sort_column = 'total_revenue' AND sort_order = 'ASC' THEN SUM(s.total_price) END ASC,
+        -- Default sort if none matches
+        SUM(s.quantity) DESC
     LIMIT limit_count;
 END //
 DELIMITER ;
