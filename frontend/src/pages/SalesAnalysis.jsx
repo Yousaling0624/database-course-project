@@ -49,7 +49,8 @@ export default function SalesAnalysis() {
                     sale_day: dateStr,
                     total_revenue: trendMap[dateStr]?.total_revenue || 0,
                     order_count: trendMap[dateStr]?.order_count || 0,
-                    total_quantity: trendMap[dateStr]?.total_quantity || 0
+                    total_quantity: trendMap[dateStr]?.total_quantity || 0,
+                    total_profit: trendMap[dateStr]?.total_profit || 0
                 });
             }
 
@@ -170,7 +171,7 @@ export default function SalesAnalysis() {
                         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm transition-all overflow-hidden">
                             {/* Sticky Top Detail Board */}
                             <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-100 mb-6">
-                                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
                                     <div className="mb-2 lg:mb-0">
                                         <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-1">
                                             <BarChart2 size={24} className="text-emerald-500" />
@@ -181,26 +182,36 @@ export default function SalesAnalysis() {
                                             {startDate} 至 {endDate}
                                         </div>
                                     </div>
+                                </div>
 
-                                    <div className="grid grid-cols-2 lg:flex lg:items-center gap-4 lg:gap-8">
-                                        <div className="flex flex-col">
-                                            <span className="text-[10px] text-slate-400 lg:text-xs uppercase font-semibold">当前日期</span>
-                                            <span className="text-base lg:text-lg font-bold text-slate-700 whitespace-nowrap">{displayDay.sale_day || '-'}</span>
-                                        </div>
-                                        <div className="w-px h-8 bg-slate-200 hidden lg:block"></div>
-                                        <div className="flex flex-col">
-                                            <span className="text-[10px] text-slate-400 lg:text-xs uppercase font-semibold">当日营收</span>
-                                            <span className="text-base lg:text-lg font-bold text-emerald-600 whitespace-nowrap">¥{displayDay.total_revenue?.toLocaleString() || '0'}</span>
-                                        </div>
-                                        <div className="w-px h-8 bg-slate-200 hidden lg:block"></div>
-                                        <div className="flex flex-col">
-                                            <span className="text-[10px] text-slate-400 lg:text-xs uppercase font-semibold">订单量</span>
-                                            <span className="text-base lg:text-lg font-bold text-teal-600 whitespace-nowrap">{displayDay.order_count || '0'} 笔</span>
-                                        </div>
-                                        <div className="w-px h-8 bg-slate-200 hidden lg:block"></div>
-                                        <div className="flex flex-col">
-                                            <span className="text-[10px] text-slate-400 lg:text-xs uppercase font-semibold">销售件数</span>
-                                            <span className="text-base lg:text-lg font-bold text-emerald-500 whitespace-nowrap">{displayDay.total_quantity || '0'} 件</span>
+                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-x-6 gap-y-4 w-full border-t border-slate-100 pt-6">
+                                    <div className="flex flex-col p-4 bg-white/50 border border-slate-100/50 rounded-xl shadow-sm">
+                                        <span className="text-[10px] text-slate-400 font-bold uppercase mb-1 tracking-wider">当前分析日期</span>
+                                        <span className="text-lg font-black text-slate-700">{displayDay.sale_day || '-'}</span>
+                                    </div>
+                                    <div className="flex flex-col p-4 bg-emerald-50/30 border border-emerald-100/50 rounded-xl shadow-sm">
+                                        <span className="text-[10px] text-emerald-600/70 font-bold uppercase mb-1 tracking-wider">当日总营收</span>
+                                        <span className="text-xl font-black text-emerald-600">¥{displayDay.total_revenue?.toLocaleString() || '0'}</span>
+                                    </div>
+                                    <div className="flex flex-col p-4 bg-teal-50/30 border border-teal-100/50 rounded-xl shadow-sm">
+                                        <span className="text-[10px] text-teal-600/70 font-bold uppercase mb-1 tracking-wider">当日订单量</span>
+                                        <span className="text-xl font-black text-teal-600">{displayDay.order_count || '0'} <span className="text-xs font-normal opacity-70">笔</span></span>
+                                    </div>
+                                    <div className="flex flex-col p-4 bg-emerald-50/30 border border-emerald-100/50 rounded-xl shadow-sm">
+                                        <span className="text-[10px] text-emerald-600/70 font-bold uppercase mb-1 tracking-wider">合计销售件数</span>
+                                        <span className="text-xl font-black text-emerald-500">{displayDay.total_quantity || '0'} <span className="text-xs font-normal opacity-70">件</span></span>
+                                    </div>
+                                    <div className="flex flex-col p-4 bg-amber-50/30 border border-amber-100/50 rounded-xl shadow-sm">
+                                        <span className="text-[10px] text-amber-600/70 font-bold uppercase mb-1 tracking-wider">估算成交毛利</span>
+                                        <span className="text-xl font-black text-amber-500">¥{(displayDay.total_profit || 0).toLocaleString()}</span>
+                                    </div>
+                                    <div className="flex flex-col p-4 bg-amber-50/30 border border-amber-100/50 rounded-xl shadow-sm">
+                                        <span className="text-[10px] text-amber-600/70 font-bold uppercase mb-1 tracking-wider">预期毛利率</span>
+                                        <div className="flex items-baseline gap-1">
+                                            <span className="text-xl font-black text-amber-600">
+                                                {displayDay.total_revenue > 0 ? ((displayDay.total_profit / displayDay.total_revenue) * 100).toFixed(1) : '0.0'}
+                                            </span>
+                                            <span className="text-sm font-bold text-amber-600/70">%</span>
                                         </div>
                                     </div>
                                 </div>
@@ -302,7 +313,15 @@ export default function SalesAnalysis() {
                                                         总销售额 {sortConfig.column === 'total_revenue' && (sortConfig.order === 'DESC' ? '↓' : '↑')}
                                                     </div>
                                                 </th>
-                                                <th className="px-4 sm:px-6 py-4 text-left text-[10px] sm:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">营收贡献</th>
+                                                <th
+                                                    className="px-4 sm:px-6 py-4 text-left text-[10px] sm:text-xs font-bold text-emerald-600 uppercase whitespace-nowrap cursor-pointer hover:bg-emerald-50 transition-colors rounded-t-lg"
+                                                    onClick={() => handleSort('total_profit')}
+                                                >
+                                                    <div className="flex items-center gap-1">
+                                                        毛利润 {sortConfig.column === 'total_profit' && (sortConfig.order === 'DESC' ? '↓' : '↑')}
+                                                    </div>
+                                                </th>
+                                                <th className="px-4 sm:px-6 py-4 text-left text-[10px] sm:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">毛利率</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50">
@@ -340,6 +359,16 @@ export default function SalesAnalysis() {
                                                         </td>
                                                         <td className="px-4 py-4">
                                                             <div className="font-bold text-slate-700 text-sm whitespace-nowrap">¥{item.total_revenue?.toLocaleString()}</div>
+                                                        </td>
+                                                        <td className="px-4 py-4">
+                                                            <div className="font-bold text-emerald-600 text-sm whitespace-nowrap">
+                                                                ¥{(item.total_profit || 0).toLocaleString()}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-4 py-4">
+                                                            <div className="font-bold text-teal-600 text-sm whitespace-nowrap">
+                                                                {item.total_revenue > 0 ? ((item.total_profit / item.total_revenue) * 100).toFixed(1) : 0}%
+                                                            </div>
                                                         </td>
                                                         <td className="px-4 py-4">
                                                             <div className="w-20 md:w-24">

@@ -147,7 +147,14 @@ export default function Reports({ showToast }) {
                             <div className="bg-gradient-to-r from-teal-500 to-emerald-600 rounded-xl p-5 sm:p-6 text-white shadow-lg shadow-teal-500/20">
                                 <p className="text-teal-100 text-sm font-medium">毛利润</p>
                                 <p className="text-2xl sm:text-3xl font-bold mt-1">¥{financialData.gross_profit?.toFixed(2) || '0.00'}</p>
-                                <p className="text-xs sm:text-sm text-teal-200 mt-2 bg-white/10 inline-block px-2 py-0.5 rounded-lg">{reportType === 'daily' ? '今日' : '本月'}</p>
+                                <div className="flex items-center gap-2 mt-2">
+                                    <span className="text-xs sm:text-sm text-teal-200 bg-white/10 px-2 py-0.5 rounded-lg">
+                                        {reportType === 'daily' ? '今日' : '本月'}
+                                    </span>
+                                    <span className="text-xs font-bold bg-white/20 text-white px-2 py-0.5 rounded-lg">
+                                        毛利率: {financialData.sales_income > 0 ? ((financialData.gross_profit / financialData.sales_income) * 100).toFixed(1) : 0}%
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     )}

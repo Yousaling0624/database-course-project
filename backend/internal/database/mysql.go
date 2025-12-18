@@ -38,7 +38,7 @@ func TryConnect() error {
 		dsn = tempDSN
 	} else {
 		// Default DSN
-		dsn = "root:root@tcp(127.0.0.1:3306)/pharma_db?charset=utf8mb4&parseTime=True&loc=Local"
+		dsn = "root:root@tcp(127.0.0.1:3306)/pharma_db?charset=utf8mb4&parseTime=True&loc=PRC"
 	}
 
 	// Try to connect

@@ -477,6 +477,7 @@ func GetTopSellingAnalysis(c *gin.Context) {
 		Type         string  `json:"type" gorm:"column:type"`
 		TotalSold    int     `json:"total_sold" gorm:"column:total_sold"`
 		TotalRevenue float64 `json:"total_revenue" gorm:"column:total_revenue"`
+		TotalProfit  float64 `json:"total_profit" gorm:"column:total_profit"`
 	}
 	var topSelling []TopSellingItem
 	database.DB.Raw("CALL sp_top_selling_medicines(?, ?, ?, ?, ?)", startDate, endDate, limit, sortBy, orderBy).Scan(&topSelling)
@@ -506,6 +507,7 @@ func GetSalesTrendAnalysis(c *gin.Context) {
 		OrderCount    int     `json:"order_count" gorm:"column:order_count"`
 		TotalQuantity int     `json:"total_quantity" gorm:"column:total_quantity"`
 		TotalRevenue  float64 `json:"total_revenue" gorm:"column:total_revenue"`
+		TotalProfit   float64 `json:"total_profit" gorm:"column:total_profit"`
 	}
 	var salesTrend []SalesTrendItem
 

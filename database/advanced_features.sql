@@ -421,13 +421,20 @@ DELIMITER //
 CREATE PROCEDURE sp_sales_trend(IN start_date DATE, IN end_date DATE)
 BEGIN
     SELECT 
-        DATE(sale_date) AS sale_day,
-        COUNT(*) AS order_count,
-        SUM(quantity) AS total_quantity,
-        SUM(total_price) AS total_revenue
-    FROM sales
-    WHERE DATE(sale_date) BETWEEN start_date AND end_date
-    GROUP BY DATE(sale_date)
+        DATE(s.sale_date) AS sale_day,
+        COUNT(s.id) AS order_count,
+        SUM(COALESCE(s.quantity, 0)) AS total_quantity,
+        SUM(COALESCE(s.total_price, 0)) AS total_revenue,
+        SUM(COALESCE(s.total_price, 0) - (COALESCE(s.quantity, 0) * COALESCE(avg_cost.avg_price, m.price * 0.65, 0))) AS total_profit
+    FROM sales s
+    JOIN medicines m ON s.medicine_id = m.id
+    LEFT JOIN (
+        SELECT medicine_id, AVG(price) as avg_price 
+        FROM inbounds 
+        GROUP BY medicine_id
+    ) avg_cost ON s.medicine_id = avg_cost.medicine_id
+    WHERE DATE(s.sale_date) BETWEEN start_date AND end_date
+    GROUP BY DATE(s.sale_date)
     ORDER BY sale_day;
 END //
 DELIMITER ;
@@ -449,17 +456,24 @@ BEGIN
         m.name,
         m.type,
         SUM(s.quantity) AS total_sold,
-        SUM(s.total_price) AS total_revenue
+        SUM(s.total_price) AS total_revenue,
+        SUM(s.total_price - (s.quantity * IFNULL(avg_cost.avg_price, m.price * 0.65))) AS total_profit
     FROM medicines m
     JOIN sales s ON m.id = s.medicine_id
+    LEFT JOIN (
+        SELECT medicine_id, AVG(price) as avg_price 
+        FROM inbounds 
+        GROUP BY medicine_id
+    ) avg_cost ON m.id = avg_cost.medicine_id
     WHERE DATE(s.sale_date) BETWEEN start_date AND end_date
-    GROUP BY m.id, m.code, m.name, m.type
+    GROUP BY m.id, m.code, m.name, m.type, avg_cost.avg_price, m.price
     ORDER BY 
         CASE WHEN sort_column = 'total_sold' AND sort_order = 'DESC' THEN SUM(s.quantity) END DESC,
         CASE WHEN sort_column = 'total_sold' AND sort_order = 'ASC' THEN SUM(s.quantity) END ASC,
         CASE WHEN sort_column = 'total_revenue' AND sort_order = 'DESC' THEN SUM(s.total_price) END DESC,
         CASE WHEN sort_column = 'total_revenue' AND sort_order = 'ASC' THEN SUM(s.total_price) END ASC,
-        -- 如果没有匹配项，则使用默认排序
+        CASE WHEN sort_column = 'total_profit' AND sort_order = 'DESC' THEN SUM(s.total_price - (s.quantity * IFNULL(avg_cost.avg_price, m.price * 0.65))) END DESC,
+        CASE WHEN sort_column = 'total_profit' AND sort_order = 'ASC' THEN SUM(s.total_price - (s.quantity * IFNULL(avg_cost.avg_price, m.price * 0.65))) END ASC,
         SUM(s.quantity) DESC
     LIMIT limit_count;
 END //

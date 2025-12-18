@@ -7,6 +7,7 @@ services:
       MYSQL_DATABASE: pharma_db
       MYSQL_USER: user
       MYSQL_PASSWORD: password
+      TZ: Asia/Shanghai
     ports:
       - "3306:3306"
     volumes:
@@ -22,7 +23,8 @@ services:
     build: ./backend
     container_name: pharmacy_backend
     environment:
-      DSN: root:root@tcp(mysql:3306)/pharma_db?charset=utf8mb4&parseTime=True&loc=Local
+      DSN: root:root@tcp(mysql:3306)/pharma_db?charset=utf8mb4&parseTime=True&loc=PRC
+      TZ: Asia/Shanghai
     ports:
       - "8080:8080"
     depends_on:
@@ -35,6 +37,7 @@ services:
     environment:
       # VITE_API_URL: http://backend:8080 # Un-comment for full docker-compose mode
       VITE_API_URL: http://172.17.0.1:8080 # For local backend dev (Linux Docker host IP)
+      TZ: Asia/Shanghai
     ports:
       - "5173:5173"
     volumes:
