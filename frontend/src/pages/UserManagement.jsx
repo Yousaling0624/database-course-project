@@ -2,17 +2,24 @@ import React, { useState, useEffect } from 'react';
 import { Search, Plus, MoreHorizontal, User, Shield } from 'lucide-react';
 import * as api from '../api';
 import Modal from '../components/Modal';
+import Pagination from '../components/Pagination';
 
 export default function UserManagement({ showToast }) {
     const [users, setUsers] = useState([]);
+    const [meta, setMeta] = useState({ page: 1, limit: 10, total: 0, total_pages: 0 });
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [formData, setFormData] = useState({ username: '', password: '', real_name: '', phone: '', role: 'staff' });
     const [editingId, setEditingId] = useState(null);
 
-    const fetchUsers = async () => {
+    const fetchUsers = async (page = 1) => {
         try {
-            const data = await api.getUsers();
-            setUsers(data);
+            const res = await api.getUsers(page, 10);
+            if (res.data) {
+                setUsers(res.data);
+                if (res.meta) setMeta(res.meta);
+            } else {
+                setUsers(res);
+            }
         } catch (err) {
             console.error(err);
             if (showToast) showToast('获取员工列表失败', 'error');
@@ -20,8 +27,12 @@ export default function UserManagement({ showToast }) {
     };
 
     useEffect(() => {
-        fetchUsers();
+        fetchUsers(1);
     }, []);
+
+    const handlePageChange = (newPage) => {
+        fetchUsers(newPage);
+    };
 
     const handleSubmit = async () => {
         try {
@@ -79,7 +90,7 @@ export default function UserManagement({ showToast }) {
                             setFormData({ username: '', password: '', real_name: '', phone: '', role: 'staff' });
                             setIsModalOpen(true);
                         }}
-                        className="btn-primary flex items-center justify-center whitespace-nowrap"
+                        className="btn-primary flex items-center justify-center whitespace-nowrap w-full sm:w-auto"
                     >
                         <Plus size={16} className="mr-2" />
                         添加员工
@@ -121,6 +132,12 @@ export default function UserManagement({ showToast }) {
                     </table>
                 </div>
             </div>
+
+            <Pagination
+                currentPage={meta.page}
+                totalPages={meta.total_pages}
+                onPageChange={handlePageChange}
+            />
 
             <Modal
                 isOpen={isModalOpen}

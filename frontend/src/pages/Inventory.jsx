@@ -1,27 +1,63 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, MoreHorizontal, Pill } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Search, Plus, MoreHorizontal, Pill, ClipboardList, Factory } from 'lucide-react';
 import * as api from '../api';
 import Modal from '../components/Modal';
+import Pagination from '../components/Pagination';
 
 export default function Inventory({ showToast }) {
+    const navigate = useNavigate();
+    const location = useLocation();
+
+    // Pagination & Filter State
     const [data, setData] = useState([]);
+    const [meta, setMeta] = useState({ page: 1, limit: 10, total: 0, total_pages: 0 });
     const [searchQuery, setSearchQuery] = useState('');
+
+    // Initial load from URL params - read synchronously in state init
+    const getInitialFilter = () => {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('filter') === 'low_stock' ? 'low_stock' : 'all';
+    };
+    const [filterStatus, setFilterStatus] = useState(getInitialFilter);
+
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [formData, setFormData] = useState({ name: '', code: '', price: '', stock: '', spec: '', manufacturer: '' });
     const [editingId, setEditingId] = useState(null);
 
-    const fetchData = async () => {
+    // Adjust Stock Modal State
+    const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
+    const [selectedAdjustItem, setSelectedAdjustItem] = useState(null);
+    const [adjustFormData, setAdjustFormData] = useState({ new_stock: '', reason: '' });
+
+    const fetchData = async (page = 1, filter = filterStatus) => {
         try {
-            const meds = await api.getMedicines(searchQuery);
-            setData(meds);
+            const res = await api.getMedicines(searchQuery, page, 10, filter);
+            if (res.data) {
+                setData(res.data);
+                setMeta(res.meta || { page: 1, limit: 10, total: 0, total_pages: 0 });
+            } else if (Array.isArray(res)) {
+                setData(res);
+            } else {
+                console.error("Invalid data format:", res);
+                setData([]);
+            }
         } catch (err) {
             console.error(err);
         }
     };
 
     useEffect(() => {
-        fetchData();
-    }, [searchQuery]);
+        fetchData(1);
+    }, [searchQuery, filterStatus]);
+
+    const handlePageChange = (newPage) => {
+        fetchData(newPage);
+    };
+
+    const handleSupplierClick = (manufacturer) => {
+        navigate(`/suppliers?keyword=${encodeURIComponent(manufacturer)}`);
+    };
 
     const handleAddMedicine = async () => {
         if (!formData.name) return;
@@ -46,7 +82,7 @@ export default function Inventory({ showToast }) {
             setIsModalOpen(false);
             setFormData({ name: '', code: '', price: '', stock: '', spec: '', manufacturer: '' });
             setEditingId(null);
-            fetchData();
+            fetchData(meta.page);
         } catch (err) {
             if (showToast) showToast('操作失败', 'error');
         }
@@ -76,6 +112,37 @@ export default function Inventory({ showToast }) {
         }
     }
 
+    // Stock Adjustment Handlers
+    const handleAdjustClick = (item) => {
+        setSelectedAdjustItem(item);
+        setAdjustFormData({ new_stock: item.stock, reason: '' });
+        setIsAdjustModalOpen(true);
+    };
+
+    const handleSubmitAdjust = async () => {
+        if (adjustFormData.new_stock === '' || adjustFormData.new_stock < 0) {
+            if (showToast) showToast('请输入有效的库存数量', 'error');
+            return;
+        }
+        if (!adjustFormData.reason.trim()) {
+            if (showToast) showToast('请输入盘点原因', 'error');
+            return;
+        }
+
+        try {
+            await api.adjustStock({
+                medicine_id: selectedAdjustItem.id,
+                new_stock: parseInt(adjustFormData.new_stock),
+                reason: adjustFormData.reason
+            });
+            if (showToast) showToast('库存盘点更新成功');
+            setIsAdjustModalOpen(false);
+            fetchData();
+        } catch (err) {
+            if (showToast) showToast('盘点更新失败: ' + (err.response?.data?.error || err.message), 'error');
+        }
+    };
+
     return (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col card-hover">
             {/* 工具栏 */}
@@ -85,6 +152,13 @@ export default function Inventory({ showToast }) {
                     库存明细
                 </h2>
                 <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                    <button
+                        onClick={() => setFilterStatus(filterStatus === 'low_stock' ? 'all' : 'low_stock')}
+                        className={`btn-secondary flex items-center justify-center whitespace-nowrap w-full sm:w-auto ${filterStatus === 'low_stock' ? 'bg-amber-100 text-amber-800 border-amber-200' : ''}`}
+                    >
+                        <ClipboardList size={16} className="mr-2" />
+                        {filterStatus === 'low_stock' ? '显示全部' : '仅看缺货/预警'}
+                    </button>
                     <div className="relative w-full sm:w-auto flex-1 sm:min-w-[250px]">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                         <input
@@ -124,7 +198,7 @@ export default function Inventory({ showToast }) {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50 text-sm">
-                        {data.map((item) => (
+                        {Array.isArray(data) && data.map((item) => (
                             <tr key={item.id} className="hover:bg-slate-50 transition-colors group">
                                 <td className="px-6 py-4 text-slate-500 font-mono whitespace-nowrap">{item.code}</td>
                                 <td className="px-6 py-4 whitespace-nowrap">
@@ -147,22 +221,33 @@ export default function Inventory({ showToast }) {
                                         </span>
                                     </div>
 
-                                    <div className="w-24 h-1.5 bg-slate-100 rounded-full mt-1.5 overflow-hidden">
+                                    <div className="w-24 h-1.5 bg-slate-100 rounded-full mt-1.5 overflow-hidden" title={`库存: ${item.stock}`}>
                                         <div
                                             className={`h-full rounded-full ${item.stock < 50 ? 'bg-red-500' : 'bg-teal-500'}`}
-                                            style={{ width: `${Math.min((item.stock / 500) * 100, 100)}%` }}
+                                            style={{ width: `${Math.min((item.stock / 100) * 100, 100)}%` }}
                                         ></div>
                                     </div>
                                 </td>
-                                <td className="px-6 py-4 text-slate-500 whitespace-nowrap">{item.manufacturer}</td>
+                                <td className="px-6 py-4 text-slate-500 whitespace-nowrap">
+                                    {item.manufacturer && (
+                                        <button
+                                            onClick={() => handleSupplierClick(item.manufacturer)}
+                                            className="flex items-center gap-1 hover:text-teal-600 transition-colors"
+                                            title="点击查看供应商信息"
+                                        >
+                                            <Factory size={14} />
+                                            {item.manufacturer}
+                                        </button>
+                                    )}
+                                </td>
                                 <td className="px-6 py-4 text-right space-x-2 whitespace-nowrap">
+                                    <button onClick={() => handleAdjustClick(item)} className="text-indigo-600 hover:text-indigo-800 font-medium text-xs">盘点</button>
                                     <button onClick={() => handleEdit(item)} className="text-teal-600 hover:text-teal-800 font-medium text-xs">编辑</button>
                                     <button onClick={() => handleDelete(item.id)} className="text-red-500 hover:text-red-700 font-medium text-xs">删除</button>
                                 </td>
                             </tr>
                         ))}
-
-                        {data.length === 0 && (
+                        {(!Array.isArray(data) || data.length === 0) && (
                             <tr>
                                 <td colSpan="7" className="px-6 py-12 text-center text-slate-400">
                                     没有找到相关药品
@@ -172,6 +257,12 @@ export default function Inventory({ showToast }) {
                     </tbody>
                 </table>
             </div>
+
+            <Pagination
+                currentPage={meta.page}
+                totalPages={meta.total_pages}
+                onPageChange={handlePageChange}
+            />
 
             <Modal
                 isOpen={isModalOpen}
@@ -234,6 +325,60 @@ export default function Inventory({ showToast }) {
                     </div>
                 </div>
             </Modal>
-        </div>
+
+            {/* Adjust Stock Modal */}
+            <Modal
+                isOpen={isAdjustModalOpen}
+                onClose={() => setIsAdjustModalOpen(false)}
+                title="库存盘点"
+            >
+                <div className="space-y-4">
+                    <div className="bg-indigo-50 p-3 rounded-lg flex items-start gap-2">
+                        <ClipboardList className="text-indigo-600 mt-0.5" size={16} />
+                        <div>
+                            <p className="text-sm font-medium text-indigo-800">盘点药品: {selectedAdjustItem?.name}</p>
+                            <p className="text-xs text-indigo-600 mt-1">
+                                当前系统库存: <b>{selectedAdjustItem?.stock}</b>
+                                <br />
+                                请输入实际盘点后的库存数量，系统将自动记录差异。
+                            </p>
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">实际库存数量</label>
+                        <input
+                            type="number"
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                            value={adjustFormData.new_stock}
+                            onChange={(e) => setAdjustFormData({ ...adjustFormData, new_stock: e.target.value })}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">盘点差异原因</label>
+                        <textarea
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all resize-none"
+                            rows="2"
+                            value={adjustFormData.reason}
+                            onChange={(e) => setAdjustFormData({ ...adjustFormData, reason: e.target.value })}
+                            placeholder="例如：药品过期销毁、遗失、录入错误等..."
+                        ></textarea>
+                    </div>
+                    <div className="pt-4 flex justify-end space-x-3">
+                        <button
+                            onClick={() => setIsAdjustModalOpen(false)}
+                            className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors text-sm font-medium"
+                        >
+                            取消
+                        </button>
+                        <button
+                            onClick={handleSubmitAdjust}
+                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors text-sm font-medium shadow-md shadow-indigo-600/20"
+                        >
+                            确认盘点
+                        </button>
+                    </div>
+                </div>
+            </Modal>
+        </div >
     );
 }

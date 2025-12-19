@@ -76,15 +76,47 @@ ORDER BY sale_day DESC;
 
 -- ==================== 存储过程 ====================
 
--- 存储过程：模糊查询药品
+-- 存储过程：模糊查询药品 (支持分页和状态过滤)
 DROP PROCEDURE IF EXISTS sp_search_medicines;
 DELIMITER //
-CREATE PROCEDURE sp_search_medicines(IN keyword VARCHAR(100))
+CREATE PROCEDURE sp_search_medicines(
+    IN keyword VARCHAR(100), 
+    IN filter_status VARCHAR(20), -- 'all', 'low_stock', 'out_of_stock'
+    IN limit_num INT, 
+    IN offset_num INT
+)
 BEGIN
     SELECT * FROM medicines 
-    WHERE name LIKE CONCAT('%', keyword, '%') 
+    WHERE (name LIKE CONCAT('%', keyword, '%') 
        OR code LIKE CONCAT('%', keyword, '%')
-       OR manufacturer LIKE CONCAT('%', keyword, '%');
+       OR manufacturer LIKE CONCAT('%', keyword, '%'))
+       AND (
+           filter_status = 'all' 
+           OR (filter_status = 'low_stock' AND stock < 50)
+           OR (filter_status = 'out_of_stock' AND stock = 0)
+       )
+    ORDER BY id DESC
+    LIMIT limit_num OFFSET offset_num;
+END //
+DELIMITER ;
+
+-- 存储过程：获取药品总数 (用于分页)
+DROP PROCEDURE IF EXISTS sp_count_medicines;
+DELIMITER //
+CREATE PROCEDURE sp_count_medicines(
+    IN keyword VARCHAR(100),
+    IN filter_status VARCHAR(20)
+)
+BEGIN
+    SELECT COUNT(*) as total FROM medicines 
+    WHERE (name LIKE CONCAT('%', keyword, '%') 
+       OR code LIKE CONCAT('%', keyword, '%')
+       OR manufacturer LIKE CONCAT('%', keyword, '%'))
+       AND (
+           filter_status = 'all' 
+           OR (filter_status = 'low_stock' AND stock < 50)
+           OR (filter_status = 'out_of_stock' AND stock = 0)
+       );
 END //
 DELIMITER ;
 
@@ -100,32 +132,71 @@ BEGIN
 END //
 DELIMITER ;
 
--- 存储过程：模糊查询客户
+-- 存储过程：模糊查询客户 (支持分页)
 DROP PROCEDURE IF EXISTS sp_search_customers;
 DELIMITER //
-CREATE PROCEDURE sp_search_customers(IN keyword VARCHAR(100))
+CREATE PROCEDURE sp_search_customers(
+    IN keyword VARCHAR(100),
+    IN limit_num INT,
+    IN offset_num INT
+)
 BEGIN
     SELECT * FROM customers 
+    WHERE name LIKE CONCAT('%', keyword, '%') 
+       OR phone LIKE CONCAT('%', keyword, '%')
+    ORDER BY id DESC
+    LIMIT limit_num OFFSET offset_num;
+END //
+DELIMITER ;
+
+-- 存储过程：获取客户总数
+DROP PROCEDURE IF EXISTS sp_count_customers;
+DELIMITER //
+CREATE PROCEDURE sp_count_customers(IN keyword VARCHAR(100))
+BEGIN
+    SELECT COUNT(*) as total FROM customers 
     WHERE name LIKE CONCAT('%', keyword, '%') 
        OR phone LIKE CONCAT('%', keyword, '%');
 END //
 DELIMITER ;
 
--- 存储过程：模糊查询供应商
+-- 存储过程：模糊查询供应商 (支持分页)
 DROP PROCEDURE IF EXISTS sp_search_suppliers;
 DELIMITER //
-CREATE PROCEDURE sp_search_suppliers(IN keyword VARCHAR(100))
+CREATE PROCEDURE sp_search_suppliers(
+    IN keyword VARCHAR(100),
+    IN limit_num INT,
+    IN offset_num INT
+)
 BEGIN
     SELECT * FROM suppliers 
+    WHERE name LIKE CONCAT('%', keyword, '%') 
+       OR contact LIKE CONCAT('%', keyword, '%')
+    ORDER BY id DESC
+    LIMIT limit_num OFFSET offset_num;
+END //
+DELIMITER ;
+
+-- 存储过程：获取供应商总数
+DROP PROCEDURE IF EXISTS sp_count_suppliers;
+DELIMITER //
+CREATE PROCEDURE sp_count_suppliers(IN keyword VARCHAR(100))
+BEGIN
+    SELECT COUNT(*) as total FROM suppliers 
     WHERE name LIKE CONCAT('%', keyword, '%') 
        OR contact LIKE CONCAT('%', keyword, '%');
 END //
 DELIMITER ;
 
--- 存储过程：模糊查询销售记录 (支持订单号、药品名、客户名)
+-- 存储过程：模糊查询销售记录 (支持分页)
 DROP PROCEDURE IF EXISTS sp_search_sales;
 DELIMITER //
-CREATE PROCEDURE sp_search_sales(IN keyword VARCHAR(100), IN filter_type VARCHAR(20))
+CREATE PROCEDURE sp_search_sales(
+    IN keyword VARCHAR(100), 
+    IN filter_type VARCHAR(20),
+    IN limit_num INT,
+    IN offset_num INT
+)
 BEGIN
     SELECT 
         s.*,
@@ -139,14 +210,38 @@ BEGIN
        OR m.name LIKE CONCAT('%', keyword, '%')
        OR c.name LIKE CONCAT('%', keyword, '%'))
        AND (filter_type = '' OR m.type = filter_type)
-    ORDER BY s.sale_date DESC;
+    ORDER BY s.sale_date DESC
+    LIMIT limit_num OFFSET offset_num;
 END //
 DELIMITER ;
 
--- 存储过程：模糊查询入库记录 (支持药品名、供应商名)
+-- 存储过程：获取销售记录总数
+DROP PROCEDURE IF EXISTS sp_count_sales;
+DELIMITER //
+CREATE PROCEDURE sp_count_sales(
+    IN keyword VARCHAR(100),
+    IN filter_type VARCHAR(20)
+)
+BEGIN
+    SELECT COUNT(*) as total
+    FROM sales s
+    LEFT JOIN medicines m ON s.medicine_id = m.id
+    LEFT JOIN customers c ON s.customer_id = c.id
+    WHERE (s.order_id LIKE CONCAT('%', keyword, '%')
+       OR m.name LIKE CONCAT('%', keyword, '%')
+       OR c.name LIKE CONCAT('%', keyword, '%'))
+       AND (filter_type = '' OR m.type = filter_type);
+END //
+DELIMITER ;
+
+-- 存储过程：模糊查询入库记录 (支持分页)
 DROP PROCEDURE IF EXISTS sp_search_inbounds;
 DELIMITER //
-CREATE PROCEDURE sp_search_inbounds(IN keyword VARCHAR(100))
+CREATE PROCEDURE sp_search_inbounds(
+    IN keyword VARCHAR(100),
+    IN limit_num INT,
+    IN offset_num INT
+)
 BEGIN
     SELECT 
         i.*,
@@ -157,7 +252,22 @@ BEGIN
     LEFT JOIN suppliers sup ON i.supplier_id = sup.id
     WHERE m.name LIKE CONCAT('%', keyword, '%')
        OR sup.name LIKE CONCAT('%', keyword, '%')
-    ORDER BY i.inbound_date DESC;
+    ORDER BY i.inbound_date DESC
+    LIMIT limit_num OFFSET offset_num;
+END //
+DELIMITER ;
+
+-- 存储过程：获取入库记录总数
+DROP PROCEDURE IF EXISTS sp_count_inbounds;
+DELIMITER //
+CREATE PROCEDURE sp_count_inbounds(IN keyword VARCHAR(100))
+BEGIN
+    SELECT COUNT(*) as total
+    FROM inbounds i
+    LEFT JOIN medicines m ON i.medicine_id = m.id
+    LEFT JOIN suppliers sup ON i.supplier_id = sup.id
+    WHERE m.name LIKE CONCAT('%', keyword, '%')
+       OR sup.name LIKE CONCAT('%', keyword, '%');
 END //
 DELIMITER ;
 
@@ -544,3 +654,125 @@ DELIMITER ;
 
 SELECT 'Advanced database features (Views, SPs, Permissions) created successfully!' AS Status;
 
+
+-- ==================== 销售和入库记录的更新/删除存储过程 ====================
+
+-- 存储过程：更新销售记录
+DROP PROCEDURE IF EXISTS sp_update_sale;
+DELIMITER //
+CREATE PROCEDURE sp_update_sale(
+    IN sale_id BIGINT,
+    IN new_medicine_id BIGINT,
+    IN new_customer_id BIGINT,
+    IN new_quantity INT
+)
+BEGIN
+    DECLARE old_medicine_id BIGINT;
+    DECLARE old_quantity INT;
+    DECLARE new_price DECIMAL(10,2);
+    DECLARE new_total DECIMAL(10,2);
+    
+    -- 获取旧的销售信息
+    SELECT medicine_id, quantity INTO old_medicine_id, old_quantity
+    FROM sales WHERE id = sale_id;
+    
+    -- 恢复旧药品库存
+    UPDATE medicines SET stock = stock + old_quantity WHERE id = old_medicine_id;
+    
+    -- 获取新药品价格
+    SELECT price INTO new_price FROM medicines WHERE id = new_medicine_id;
+    SET new_total = new_price * new_quantity;
+    
+    -- 检查新药品库存是否充足
+    IF (SELECT stock FROM medicines WHERE id = new_medicine_id) < new_quantity THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '库存不足';
+    END IF;
+    
+    -- 扣减新药品库存
+    UPDATE medicines SET stock = stock - new_quantity WHERE id = new_medicine_id;
+    
+    -- 更新销售记录
+    UPDATE sales 
+    SET medicine_id = new_medicine_id,
+        customer_id = new_customer_id,
+        quantity = new_quantity,
+        total_price = new_total
+    WHERE id = sale_id;
+END //
+DELIMITER ;
+
+-- 存储过程：删除销售记录
+DROP PROCEDURE IF EXISTS sp_delete_sale;
+DELIMITER //
+CREATE PROCEDURE sp_delete_sale(IN sale_id BIGINT)
+BEGIN
+    DECLARE med_id BIGINT;
+    DECLARE qty INT;
+    
+    -- 获取销售信息
+    SELECT medicine_id, quantity INTO med_id, qty
+    FROM sales WHERE id = sale_id;
+    
+    -- 恢复库存
+    UPDATE medicines SET stock = stock + qty WHERE id = med_id;
+    
+    -- 删除销售记录
+    DELETE FROM sales WHERE id = sale_id;
+END //
+DELIMITER ;
+
+-- 存储过程：更新入库记录
+DROP PROCEDURE IF EXISTS sp_update_inbound;
+DELIMITER //
+CREATE PROCEDURE sp_update_inbound(
+    IN inbound_id BIGINT,
+    IN new_medicine_id BIGINT,
+    IN new_supplier_id BIGINT,
+    IN new_quantity INT,
+    IN new_price DECIMAL(10,2)
+)
+BEGIN
+    DECLARE old_medicine_id BIGINT;
+    DECLARE old_quantity INT;
+    
+    -- 获取旧的入库信息
+    SELECT medicine_id, quantity INTO old_medicine_id, old_quantity
+    FROM inbounds WHERE id = inbound_id;
+    
+    -- 调整旧药品库存（减去旧入库量）
+    UPDATE medicines SET stock = stock - old_quantity WHERE id = old_medicine_id;
+    
+    -- 增加新药品库存
+    UPDATE medicines SET stock = stock + new_quantity WHERE id = new_medicine_id;
+    
+    -- 更新入库记录
+    UPDATE inbounds 
+    SET medicine_id = new_medicine_id,
+        supplier_id = new_supplier_id,
+        quantity = new_quantity,
+        price = new_price
+    WHERE id = inbound_id;
+END //
+DELIMITER ;
+
+-- 存储过程：删除入库记录
+DROP PROCEDURE IF EXISTS sp_delete_inbound;
+DELIMITER //
+CREATE PROCEDURE sp_delete_inbound(IN inbound_id BIGINT)
+BEGIN
+    DECLARE med_id BIGINT;
+    DECLARE qty INT;
+    
+    -- 获取入库信息
+    SELECT medicine_id, quantity INTO med_id, qty
+    FROM inbounds WHERE id = inbound_id;
+    
+    -- 减少库存
+    UPDATE medicines SET stock = stock - qty WHERE id = med_id;
+    
+    -- 删除入库记录
+    DELETE FROM inbounds WHERE id = inbound_id;
+END //
+DELIMITER ;
+
+SELECT 'Update/Delete stored procedures for sales and inbounds created successfully!' AS Status;

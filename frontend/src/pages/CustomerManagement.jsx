@@ -2,31 +2,37 @@ import React, { useState, useEffect } from 'react';
 import { Search, Plus, MoreHorizontal, User, Phone } from 'lucide-react';
 import * as api from '../api';
 import Modal from '../components/Modal';
+import Pagination from '../components/Pagination';
 
 export default function CustomerManagement({ showToast }) {
     const [customers, setCustomers] = useState([]);
+    const [meta, setMeta] = useState({ page: 1, limit: 10, total: 0, total_pages: 0 });
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [formData, setFormData] = useState({ name: '', phone: '' });
     const [editingId, setEditingId] = useState(null);
 
     const [searchTerm, setSearchTerm] = useState('');
 
-    const fetchCustomers = async (keyword = '') => {
+    const fetchCustomers = async (page = 1, keyword = '') => {
         try {
-            const data = await api.getCustomers(keyword);
-            setCustomers(data);
+            const res = await api.getCustomers(keyword || searchTerm, page, 10);
+            setCustomers(res.data || res);
+            if (res.meta) setMeta(res.meta);
         } catch (err) {
             if (showToast) showToast('获取客户列表失败', 'error');
         }
     };
 
     useEffect(() => {
-        // Debounce search
         const timer = setTimeout(() => {
-            fetchCustomers(searchTerm);
+            fetchCustomers(1);
         }, 500);
         return () => clearTimeout(timer);
     }, [searchTerm]);
+
+    const handlePageChange = (newPage) => {
+        fetchCustomers(newPage);
+    };
 
     const handleSubmit = async () => {
         try {
@@ -80,9 +86,7 @@ export default function CustomerManagement({ showToast }) {
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
-                            <svg className="w-4 h-4 text-slate-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            </svg>
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                         </div>
                         <button
                             onClick={() => {
@@ -141,6 +145,12 @@ export default function CustomerManagement({ showToast }) {
                     </table>
                 </div>
             </div>
+
+            <Pagination
+                currentPage={meta.page}
+                totalPages={meta.total_pages}
+                onPageChange={handlePageChange}
+            />
 
             <Modal
                 isOpen={isModalOpen}

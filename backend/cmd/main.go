@@ -65,10 +65,14 @@ func main() {
 		// Inbounds
 		apiGroup.GET("/inbounds", api.GetInbounds)
 		apiGroup.POST("/inbounds", api.CreateInbound)
+		apiGroup.PUT("/inbounds/:id", api.UpdateInbound)
+		apiGroup.DELETE("/inbounds/:id", api.DeleteInbound)
 
 		// Sales
 		apiGroup.GET("/sales", api.GetSales)
 		apiGroup.POST("/sales", api.CreateSale)
+		apiGroup.PUT("/sales/:id", api.UpdateSale)
+		apiGroup.DELETE("/sales/:id", api.DeleteSale)
 
 		// Reports
 		apiGroup.GET("/reports/inbound", api.GetInboundReport)

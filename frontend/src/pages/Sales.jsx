@@ -1,30 +1,47 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, ShoppingCart, User, Calendar } from 'lucide-react';
+import { Plus, ShoppingCart, User, RotateCcw, Search } from 'lucide-react';
 import * as api from '../api';
 import Modal from '../components/Modal';
 
+import Pagination from '../components/Pagination';
+
 export default function Sales({ showToast }) {
     const [sales, setSales] = useState([]);
+    const [meta, setMeta] = useState({ page: 1, limit: 10, total: 0, total_pages: 0 });
     const [isModalOpen, setIsModalOpen] = useState(false);
+
+    // Return Modal State
+    const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+    const [selectedReturnItem, setSelectedReturnItem] = useState(null);
+    const [returnReason, setReturnReason] = useState('');
 
     // Selections
     const [medicines, setMedicines] = useState([]);
     const [customers, setCustomers] = useState([]);
 
     const [formData, setFormData] = useState({ medicine_id: '', customer_id: '', quantity: '' });
+    const [editingId, setEditingId] = useState(null);
 
     const [searchTerm, setSearchTerm] = useState('');
     const [showPrescriptionOnly, setShowPrescriptionOnly] = useState(false);
 
-    const fetchSales = async (keyword = '', type = '') => {
-        try {
-            // If type logic is needed (e.g. only passing '处方药' when checkbox checked)
-            const typeFilter = showPrescriptionOnly ? '处方药' : '';
-            // Allow overriding if needed, otherwise use state
-            const finalType = type || typeFilter;
+    // Get user role from localStorage
+    const userRole = JSON.parse(localStorage.getItem('user') || '{}').role || 'staff';
 
-            const data = await api.getSales(keyword, finalType);
-            setSales(data);
+    const fetchSales = async (page = 1, keyword = '', type = '') => {
+        try {
+            const typeFilter = showPrescriptionOnly ? '处方药' : '';
+            const finalType = type || typeFilter;
+            // Use current searchTerm if keyword not provided (or rely on effect)
+            const search = keyword || searchTerm;
+
+            const res = await api.getSales(search, finalType, page, 10);
+            if (res.data) {
+                setSales(res.data);
+                setMeta(res.meta);
+            } else {
+                setSales(res);
+            }
         } catch (err) {
             if (showToast) showToast('获取销售记录失败', 'error');
         }
@@ -32,25 +49,30 @@ export default function Sales({ showToast }) {
 
     const fetchSelections = async () => {
         try {
-            const [meds, custs] = await Promise.all([api.getMedicines(''), api.getCustomers('')]);
-            setMedicines(meds);
-            setCustomers(custs);
+            const [medsRes, custsRes] = await Promise.all([api.getMedicines(''), api.getCustomers('')]);
+            // Handle new paginated response format
+            setMedicines(medsRes.data || medsRes);
+            setCustomers(custsRes.data || custsRes);
         } catch (err) {
             console.error(err);
         }
     }
 
     useEffect(() => {
-        // Debounce search
         const timer = setTimeout(() => {
-            const typeFilter = showPrescriptionOnly ? '处方药' : '';
-            fetchSales(searchTerm, typeFilter);
+            fetchSales(1);
         }, 500);
         return () => clearTimeout(timer);
     }, [searchTerm, showPrescriptionOnly]);
 
+    const handlePageChange = (newPage) => {
+        fetchSales(newPage);
+    };
+
     const handleOpenModal = () => {
         fetchSelections();
+        setEditingId(null);
+        setFormData({ medicine_id: '', customer_id: '', quantity: '' });
         setIsModalOpen(true);
     }
 
@@ -61,18 +83,76 @@ export default function Sales({ showToast }) {
         }
 
         try {
-            await api.createSale({
-                medicine_id: parseInt(formData.medicine_id),
-                customer_id: parseInt(formData.customer_id),
-                quantity: parseInt(formData.quantity)
-            });
-            if (showToast) showToast('销售登记成功');
+            if (editingId) {
+                await api.updateSale(editingId, {
+                    medicine_id: parseInt(formData.medicine_id),
+                    customer_id: parseInt(formData.customer_id),
+                    quantity: parseInt(formData.quantity)
+                });
+                if (showToast) showToast('销售记录更新成功');
+            } else {
+                await api.createSale({
+                    medicine_id: parseInt(formData.medicine_id),
+                    customer_id: parseInt(formData.customer_id),
+                    quantity: parseInt(formData.quantity)
+                });
+                if (showToast) showToast('销售登记成功');
+            }
             setIsModalOpen(false);
             setFormData({ medicine_id: '', customer_id: '', quantity: '' });
-            fetchSales(searchTerm);
+            setEditingId(null);
+            fetchSales(meta.page);
         } catch (err) {
             console.error(err);
-            if (showToast) showToast('销售失败: ' + (err.response?.data?.error || '库存不足或未知错误'), 'error');
+            if (showToast) showToast(editingId ? '更新失败' : '销售失败: ' + (err.response?.data?.error || '库存不足或未知错误'), 'error');
+        }
+    };
+
+    const handleEdit = (item) => {
+        fetchSelections();
+        setFormData({
+            medicine_id: item.medicine_id,
+            customer_id: item.customer_id,
+            quantity: item.quantity
+        });
+        setEditingId(item.id);
+        setIsModalOpen(true);
+    };
+
+    const handleDelete = async (id) => {
+        if (!window.confirm('确定要删除这条销售记录吗？库存将自动恢复。')) return;
+        try {
+            await api.deleteSale(id);
+            if (showToast) showToast('销售记录删除成功');
+            fetchSales(meta.page);
+        } catch (err) {
+            if (showToast) showToast('删除失败', 'error');
+        }
+    };
+
+    // Return Handlers
+    const handleReturnClick = (item) => {
+        setSelectedReturnItem(item);
+        setReturnReason('');
+        setIsReturnModalOpen(true);
+    };
+
+    const handleSubmitReturn = async () => {
+        if (!returnReason.trim()) {
+            if (showToast) showToast('请填写退货原因', 'error');
+            return;
+        }
+        try {
+            await api.createSalesReturn({
+                sale_id: selectedReturnItem.id,
+                reason: returnReason
+            });
+            if (showToast) showToast('退货处理成功');
+            setIsReturnModalOpen(false);
+            setIsReturnModalOpen(false);
+            fetchSales(meta.page);
+        } catch (err) {
+            if (showToast) showToast('退货失败: ' + (err.response?.data?.error || err.message), 'error');
         }
     };
 
@@ -93,9 +173,7 @@ export default function Sales({ showToast }) {
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
-                            <svg className="w-4 h-4 text-slate-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            </svg>
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                         </div>
                         <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-slate-200 shadow-sm hover:border-teal-200 transition-colors w-full sm:w-auto justify-center sm:justify-start">
                             <input
@@ -129,6 +207,7 @@ export default function Sales({ showToast }) {
                                 <th className="px-6 py-4 whitespace-nowrap">销售数量</th>
                                 <th className="px-6 py-4 whitespace-nowrap">总价</th>
                                 <th className="px-6 py-4 whitespace-nowrap">销售时间</th>
+                                <th className="px-6 py-4 whitespace-nowrap text-right">操作</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50 text-sm">
@@ -159,11 +238,38 @@ export default function Sales({ showToast }) {
                                     <td className="px-6 py-4 text-slate-400 text-xs whitespace-nowrap">
                                         {new Date(item.sale_date).toLocaleString()}
                                     </td>
+                                    <td className="px-6 py-4 text-right whitespace-nowrap">
+                                        <div className="flex items-center justify-end gap-2">
+                                            {userRole === 'admin' && (
+                                                <>
+                                                    <button
+                                                        onClick={() => handleEdit(item)}
+                                                        className="text-teal-600 hover:text-teal-800 font-medium text-xs"
+                                                    >
+                                                        编辑
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDelete(item.id)}
+                                                        className="text-red-500 hover:text-red-700 font-medium text-xs"
+                                                    >
+                                                        删除
+                                                    </button>
+                                                </>
+                                            )}
+                                            <button
+                                                onClick={() => handleReturnClick(item)}
+                                                className="text-orange-500 hover:text-orange-700 font-medium text-xs flex items-center gap-1"
+                                            >
+                                                <RotateCcw size={14} />
+                                                退货
+                                            </button>
+                                        </div>
+                                    </td>
                                 </tr>
                             ))}
                             {sales.length === 0 && (
                                 <tr>
-                                    <td colSpan="6" className="px-6 py-12 text-center text-slate-400">
+                                    <td colSpan="7" className="px-6 py-12 text-center text-slate-400">
                                         暂无销售记录
                                     </td>
                                 </tr>
@@ -173,10 +279,16 @@ export default function Sales({ showToast }) {
                 </div>
             </div>
 
+            <Pagination
+                currentPage={meta.page}
+                totalPages={meta.total_pages}
+                onPageChange={handlePageChange}
+            />
+
             <Modal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
-                title="新建销售订单"
+                title={editingId ? "编辑销售订单" : "新建销售订单"}
             >
                 <div className="space-y-4">
                     <div>
@@ -232,6 +344,54 @@ export default function Sales({ showToast }) {
                     </div>
                 </div>
             </Modal>
+
+            {/* Return Modal */}
+            <Modal
+                isOpen={isReturnModalOpen}
+                onClose={() => setIsReturnModalOpen(false)}
+                title="销售退货"
+            >
+                <div className="space-y-4">
+                    <div className="bg-orange-50 p-3 rounded-lg flex items-start gap-2">
+                        <RotateCcw className="text-orange-600 mt-0.5" size={16} />
+                        <div>
+                            <p className="text-sm font-medium text-orange-800">退货确认</p>
+                            <p className="text-xs text-orange-600 mt-1">
+                                您正在处理订单 <b>{selectedReturnItem?.order_id}</b> 的退货。
+                                <br />
+                                药品: {selectedReturnItem?.medicine_name} × {selectedReturnItem?.quantity}
+                                <br />
+                                确认后库存将自动恢复。
+                            </p>
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">退货原因</label>
+                        <textarea
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all resize-none"
+                            rows="3"
+                            value={returnReason}
+                            onChange={(e) => setReturnReason(e.target.value)}
+                            placeholder="请输入退货原因..."
+                        ></textarea>
+                    </div>
+                    <div className="pt-4 flex justify-end space-x-3">
+                        <button
+                            onClick={() => setIsReturnModalOpen(false)}
+                            className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors text-sm font-medium"
+                        >
+                            取消
+                        </button>
+                        <button
+                            onClick={handleSubmitReturn}
+                            className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors text-sm font-medium shadow-md shadow-orange-500/20"
+                        >
+                            确认退货
+                        </button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 }
+

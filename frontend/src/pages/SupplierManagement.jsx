@@ -1,32 +1,49 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Search, Plus, Truck, Phone, MapPin } from 'lucide-react';
 import * as api from '../api';
 import Modal from '../components/Modal';
+import Pagination from '../components/Pagination';
 
 export default function SupplierManagement({ showToast }) {
+    const location = useLocation();
     const [suppliers, setSuppliers] = useState([]);
+    const [meta, setMeta] = useState({ page: 1, limit: 10, total: 0, total_pages: 0 });
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [formData, setFormData] = useState({ name: '', contact: '', phone: '' });
     const [editingId, setEditingId] = useState(null);
 
     const [searchTerm, setSearchTerm] = useState('');
 
-    const fetchSuppliers = async (keyword = '') => {
+    // Read URL params on mount
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const keyword = params.get('keyword');
+        if (keyword) {
+            setSearchTerm(keyword);
+        }
+    }, [location.search]);
+
+    const fetchSuppliers = async (page = 1, keyword = '') => {
         try {
-            const data = await api.getSuppliers(keyword);
-            setSuppliers(data);
+            const res = await api.getSuppliers(keyword || searchTerm, page, 10);
+            setSuppliers(res.data || res);
+            if (res.meta) setMeta(res.meta);
         } catch (err) {
             if (showToast) showToast('获取供应商列表失败', 'error');
         }
     };
 
     useEffect(() => {
-        // Debounce search
         const timer = setTimeout(() => {
-            fetchSuppliers(searchTerm);
+            fetchSuppliers(1);
         }, 500);
         return () => clearTimeout(timer);
     }, [searchTerm]);
+
+    const handlePageChange = (newPage) => {
+        fetchSuppliers(newPage);
+    };
 
     const handleSubmit = async () => {
         try {
@@ -80,9 +97,7 @@ export default function SupplierManagement({ showToast }) {
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
-                            <svg className="w-4 h-4 text-slate-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            </svg>
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                         </div>
                         <button
                             onClick={() => {
@@ -138,6 +153,12 @@ export default function SupplierManagement({ showToast }) {
                     </table>
                 </div>
             </div>
+
+            <Pagination
+                currentPage={meta.page}
+                totalPages={meta.total_pages}
+                onPageChange={handlePageChange}
+            />
 
             <Modal
                 isOpen={isModalOpen}

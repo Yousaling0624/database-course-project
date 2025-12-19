@@ -7,36 +7,40 @@ export const login = (data) => request.post('/login', data);
 export const getStats = () => request.get('/dashboard/stats');
 
 // Users
-export const getUsers = () => request.get('/users');
+export const getUsers = (page = 1, limit = 10) => request.get('/users', { params: { page, limit } });
 export const createUser = (data) => request.post('/users', data);
 export const updateUser = (id, data) => request.put(`/users/${id}`, data);
 export const deleteUser = (id) => request.delete(`/users/${id}`);
 
 // Medicines
-export const getMedicines = (search) => request.get('/medicines', { params: { search } });
+export const getMedicines = (search, page = 1, limit = 10, filter = 'all') => request.get('/medicines', { params: { search, page, limit, filter } });
 export const createMedicine = (data) => request.post('/medicines', data);
 export const updateMedicine = (id, data) => request.put(`/medicines/${id}`, data);
 export const deleteMedicine = (id) => request.delete(`/medicines/${id}`);
 
 // Customers
-export const getCustomers = (keyword) => request.get('/customers', { params: { keyword } });
+export const getCustomers = (keyword, page = 1, limit = 10) => request.get('/customers', { params: { keyword, page, limit } });
 export const createCustomer = (data) => request.post('/customers', data);
 export const updateCustomer = (id, data) => request.put(`/customers/${id}`, data);
 export const deleteCustomer = (id) => request.delete(`/customers/${id}`);
 
 // Suppliers
-export const getSuppliers = (keyword) => request.get('/suppliers', { params: { keyword } });
+export const getSuppliers = (keyword, page = 1, limit = 10) => request.get('/suppliers', { params: { keyword, page, limit } });
 export const createSupplier = (data) => request.post('/suppliers', data);
 export const updateSupplier = (id, data) => request.put(`/suppliers/${id}`, data);
 export const deleteSupplier = (id) => request.delete(`/suppliers/${id}`);
 
 // Inbound
-export const getInbounds = (keyword) => request.get('/inbounds', { params: { keyword } });
+export const getInbounds = (keyword, page = 1, limit = 10) => request.get('/inbounds', { params: { keyword, page, limit } });
 export const createInbound = (data) => request.post('/inbounds', data);
+export const updateInbound = (id, data) => request.put(`/inbounds/${id}`, data);
+export const deleteInbound = (id) => request.delete(`/inbounds/${id}`);
 
 // Sales
-export const getSales = (keyword, type) => request.get('/sales', { params: { keyword, type } });
+export const getSales = (keyword, type, page = 1, limit = 10) => request.get('/sales', { params: { keyword, type, page, limit } });
 export const createSale = (data) => request.post('/sales', data);
+export const updateSale = (id, data) => request.put(`/sales/${id}`, data);
+export const deleteSale = (id) => request.delete(`/sales/${id}`);
 
 // Reports
 export const getInboundReport = (startDate, endDate) => request.get('/reports/inbound', { params: { start_date: startDate, end_date: endDate } });

@@ -1,24 +1,36 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Package, Truck, Calendar, Search } from 'lucide-react';
+import { Plus, Package, Truck, RotateCcw, Search } from 'lucide-react';
 import * as api from '../api';
 import Modal from '../components/Modal';
+import Pagination from '../components/Pagination';
 
 export default function InboundManagement({ showToast }) {
     const [inbounds, setInbounds] = useState([]);
+    const [meta, setMeta] = useState({ page: 1, limit: 10, total: 0, total_pages: 0 });
     const [isModalOpen, setIsModalOpen] = useState(false);
+
+    // Return Modal State
+    const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+    const [selectedReturnItem, setSelectedReturnItem] = useState(null);
+    const [returnReason, setReturnReason] = useState('');
 
     // Selections for Modal
     const [medicines, setMedicines] = useState([]);
     const [suppliers, setSuppliers] = useState([]);
 
     const [formData, setFormData] = useState({ medicine_id: '', supplier_id: '', quantity: '', price: '' });
+    const [editingId, setEditingId] = useState(null);
 
     const [searchTerm, setSearchTerm] = useState('');
 
-    const fetchInbounds = async (keyword = '') => {
+    // Get user role from localStorage
+    const userRole = JSON.parse(localStorage.getItem('user') || '{}').role || 'staff';
+
+    const fetchInbounds = async (page = 1, keyword = '') => {
         try {
-            const data = await api.getInbounds(keyword);
-            setInbounds(data);
+            const res = await api.getInbounds(keyword || searchTerm, page, 10);
+            setInbounds(res.data || res);
+            if (res.meta) setMeta(res.meta);
         } catch (err) {
             if (showToast) showToast('获取入库记录失败', 'error');
         }
@@ -26,24 +38,29 @@ export default function InboundManagement({ showToast }) {
 
     const fetchSelections = async () => {
         try {
-            const [meds, sups] = await Promise.all([api.getMedicines(''), api.getSuppliers('')]);
-            setMedicines(meds);
-            setSuppliers(sups);
+            const [medsRes, supsRes] = await Promise.all([api.getMedicines(''), api.getSuppliers('')]);
+            setMedicines(medsRes.data || medsRes);
+            setSuppliers(supsRes.data || supsRes);
         } catch (err) {
             console.error(err);
         }
     }
 
     useEffect(() => {
-        // Debounce search
         const timer = setTimeout(() => {
-            fetchInbounds(searchTerm);
+            fetchInbounds(1);
         }, 500);
         return () => clearTimeout(timer);
     }, [searchTerm]);
 
+    const handlePageChange = (newPage) => {
+        fetchInbounds(newPage);
+    };
+
     const handleOpenModal = () => {
         fetchSelections();
+        setEditingId(null);
+        setFormData({ medicine_id: '', supplier_id: '', quantity: '', price: '' });
         setIsModalOpen(true);
     }
 
@@ -54,18 +71,77 @@ export default function InboundManagement({ showToast }) {
         }
 
         try {
-            await api.createInbound({
-                medicine_id: parseInt(formData.medicine_id),
-                supplier_id: parseInt(formData.supplier_id),
-                quantity: parseInt(formData.quantity),
-                price: parseFloat(formData.price)
-            });
-            if (showToast) showToast('入库登记成功');
+            if (editingId) {
+                await api.updateInbound(editingId, {
+                    medicine_id: parseInt(formData.medicine_id),
+                    supplier_id: parseInt(formData.supplier_id),
+                    quantity: parseInt(formData.quantity),
+                    price: parseFloat(formData.price)
+                });
+                if (showToast) showToast('入库记录更新成功');
+            } else {
+                await api.createInbound({
+                    medicine_id: parseInt(formData.medicine_id),
+                    supplier_id: parseInt(formData.supplier_id),
+                    quantity: parseInt(formData.quantity),
+                    price: parseFloat(formData.price)
+                });
+                if (showToast) showToast('入库登记成功');
+            }
             setIsModalOpen(false);
             setFormData({ medicine_id: '', supplier_id: '', quantity: '', price: '' });
+            setEditingId(null);
             fetchInbounds(searchTerm);
         } catch (err) {
-            if (showToast) showToast('入库失败', 'error');
+            if (showToast) showToast(editingId ? '更新失败' : '入库失败', 'error');
+        }
+    };
+
+    const handleEdit = (item) => {
+        fetchSelections();
+        setFormData({
+            medicine_id: item.medicine_id,
+            supplier_id: item.supplier_id,
+            quantity: item.quantity,
+            price: item.price
+        });
+        setEditingId(item.id);
+        setIsModalOpen(true);
+    };
+
+    const handleDelete = async (id) => {
+        if (!window.confirm('确定要删除这条入库记录吗？库存将自动调整。')) return;
+        try {
+            await api.deleteInbound(id);
+            if (showToast) showToast('入库记录删除成功');
+            fetchInbounds(searchTerm);
+        } catch (err) {
+            if (showToast) showToast('删除失败', 'error');
+        }
+    };
+
+    // Return Handlers
+    const handleReturnClick = (item) => {
+        setSelectedReturnItem(item);
+        setReturnReason('');
+        setIsReturnModalOpen(true);
+    };
+
+    const handleSubmitReturn = async () => {
+        if (!returnReason.trim()) {
+            if (showToast) showToast('请填写退货原因', 'error');
+            return;
+        }
+        try {
+            await api.createPurchaseReturn({
+                inbound_id: selectedReturnItem.id,
+                reason: returnReason
+            });
+            if (showToast) showToast('采购退货处理成功');
+            setIsReturnModalOpen(false);
+            fetchInbounds(searchTerm);
+        } catch (err) {
+            if (showToast) showToast('退货失败: ' + (err.response?.data?.error || err.message), 'error');
         }
     };
 
@@ -81,14 +157,12 @@ export default function InboundManagement({ showToast }) {
                         <div className="relative flex-1 sm:w-64">
                             <input
                                 type="text"
-                                placeholder="搜索药品/供应商..."
+                                placeholder="搜索药品/供应商/单号..."
                                 className="input-field pl-10"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
-                            <svg className="w-4 h-4 text-slate-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            </svg>
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                         </div>
                         <button
                             onClick={handleOpenModal}
@@ -109,6 +183,7 @@ export default function InboundManagement({ showToast }) {
                                 <th className="px-6 py-4 whitespace-nowrap">入库数量</th>
                                 <th className="px-6 py-4 whitespace-nowrap">进货单价</th>
                                 <th className="px-6 py-4 whitespace-nowrap">入库时间</th>
+                                <th className="px-6 py-4 whitespace-nowrap text-right">操作</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50 text-sm">
@@ -131,11 +206,38 @@ export default function InboundManagement({ showToast }) {
                                     <td className="px-6 py-4 text-slate-400 text-xs whitespace-nowrap">
                                         {new Date(item.inbound_date).toLocaleString()}
                                     </td>
+                                    <td className="px-6 py-4 text-right whitespace-nowrap">
+                                        <div className="flex items-center justify-end gap-2">
+                                            {userRole === 'admin' && (
+                                                <>
+                                                    <button
+                                                        onClick={() => handleEdit(item)}
+                                                        className="text-teal-600 hover:text-teal-800 font-medium text-xs"
+                                                    >
+                                                        编辑
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDelete(item.id)}
+                                                        className="text-red-500 hover:text-red-700 font-medium text-xs"
+                                                    >
+                                                        删除
+                                                    </button>
+                                                </>
+                                            )}
+                                            <button
+                                                onClick={() => handleReturnClick(item)}
+                                                className="text-orange-500 hover:text-orange-700 font-medium text-xs flex items-center gap-1"
+                                            >
+                                                <RotateCcw size={14} />
+                                                退货
+                                            </button>
+                                        </div>
+                                    </td>
                                 </tr>
                             ))}
                             {inbounds.length === 0 && (
                                 <tr>
-                                    <td colSpan="5" className="px-6 py-12 text-center text-slate-400">
+                                    <td colSpan="6" className="px-6 py-12 text-center text-slate-400">
                                         暂无入库记录
                                     </td>
                                 </tr>
@@ -145,10 +247,16 @@ export default function InboundManagement({ showToast }) {
                 </div>
             </div>
 
+            <Pagination
+                currentPage={meta.page}
+                totalPages={meta.total_pages}
+                onPageChange={handlePageChange}
+            />
+
             <Modal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
-                title="新建入库单"
+                title={editingId ? "编辑入库记录" : "新建入库单"}
             >
                 <div className="space-y-4">
                     <div>
@@ -213,6 +321,54 @@ export default function InboundManagement({ showToast }) {
                     </div>
                 </div>
             </Modal>
+
+            {/* Return Modal */}
+            <Modal
+                isOpen={isReturnModalOpen}
+                onClose={() => setIsReturnModalOpen(false)}
+                title="采购退货"
+            >
+                <div className="space-y-4">
+                    <div className="bg-orange-50 p-3 rounded-lg flex items-start gap-2">
+                        <RotateCcw className="text-orange-600 mt-0.5" size={16} />
+                        <div>
+                            <p className="text-sm font-medium text-orange-800">退货确认</p>
+                            <p className="text-xs text-orange-600 mt-1">
+                                您正在处理药品 <b>{selectedReturnItem?.medicine_name}</b> 的入库退货。
+                                <br />
+                                数量: {selectedReturnItem?.quantity}
+                                <br />
+                                确认后库存将相应减少。
+                            </p>
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">退货原因</label>
+                        <textarea
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all resize-none"
+                            rows="3"
+                            value={returnReason}
+                            onChange={(e) => setReturnReason(e.target.value)}
+                            placeholder="请输入退货原因..."
+                        ></textarea>
+                    </div>
+                    <div className="pt-4 flex justify-end space-x-3">
+                        <button
+                            onClick={() => setIsReturnModalOpen(false)}
+                            className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors text-sm font-medium"
+                        >
+                            取消
+                        </button>
+                        <button
+                            onClick={handleSubmitReturn}
+                            className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors text-sm font-medium shadow-md shadow-orange-500/20"
+                        >
+                            确认退货
+                        </button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 }
+

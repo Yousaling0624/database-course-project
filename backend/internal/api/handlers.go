@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -14,6 +15,27 @@ import (
 	"github.com/yousaling0624/database-course-project/backend/internal/model"
 	"golang.org/x/crypto/bcrypt"
 )
+
+// Pagination Helper
+type Pagination struct {
+	Page       int   `json:"page"`
+	Limit      int   `json:"limit"`
+	Total      int64 `json:"total"`
+	TotalPages int   `json:"total_pages"`
+}
+
+func getPaginationParams(c *gin.Context) (int, int, int) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if page < 1 {
+		page = 1
+	}
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	if limit < 1 {
+		limit = 10
+	}
+	offset := (page - 1) * limit
+	return page, limit, offset
+}
 
 // Search Response Structs
 type SearchSalesRecord struct {
@@ -79,9 +101,24 @@ func Login(c *gin.Context) {
 
 // ==================== Users ====================
 func GetUsers(c *gin.Context) {
+	page, limit, offset := getPaginationParams(c)
+
 	var users []model.User
-	database.DB.Find(&users)
-	c.JSON(http.StatusOK, users)
+	database.DB.Offset(offset).Limit(limit).Find(&users)
+
+	var total int64
+	database.DB.Model(&model.User{}).Count(&total)
+	totalPages := math.Ceil(float64(total) / float64(limit))
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": users,
+		"meta": Pagination{
+			Page:       page,
+			Limit:      limit,
+			Total:      total,
+			TotalPages: int(totalPages),
+		},
+	})
 }
 
 func CreateUser(c *gin.Context) {
@@ -155,14 +192,31 @@ func DeleteUser(c *gin.Context) {
 func GetMedicines(c *gin.Context) {
 	meds := make([]model.Medicine, 0)
 	search := c.Query("search")
+	filterStatus := c.DefaultQuery("filter", "all") // all, low_stock, out_of_stock
 
-	// Use Stored Procedure for fuzzy search (matches name, code, or manufacturer)
-	if err := database.DB.Raw("CALL sp_search_medicines(?)", search).Scan(&meds).Error; err != nil {
+	page, limit, offset := getPaginationParams(c)
+
+	// Use Stored Procedure for fuzzy search with pagination
+	if err := database.DB.Raw("CALL sp_search_medicines(?, ?, ?, ?)", search, filterStatus, limit, offset).Scan(&meds).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, meds)
+	// Get Total Count
+	var total int64
+	database.DB.Raw("CALL sp_count_medicines(?, ?)", search, filterStatus).Scan(&total)
+
+	totalPages := math.Ceil(float64(total) / float64(limit))
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": meds,
+		"meta": Pagination{
+			Page:       page,
+			Limit:      limit,
+			Total:      total,
+			TotalPages: int(totalPages),
+		},
+	})
 }
 
 func CreateMedicine(c *gin.Context) {
@@ -210,12 +264,27 @@ func DeleteMedicine(c *gin.Context) {
 // ==================== Customers ====================
 func GetCustomers(c *gin.Context) {
 	keyword := c.Query("keyword")
+	page, limit, offset := getPaginationParams(c)
+
 	customers := make([]model.Customer, 0)
-	if err := database.DB.Raw("CALL sp_search_customers(?)", keyword).Scan(&customers).Error; err != nil {
+	if err := database.DB.Raw("CALL sp_search_customers(?, ?, ?)", keyword, limit, offset).Scan(&customers).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, customers)
+
+	var total int64
+	database.DB.Raw("CALL sp_count_customers(?)", keyword).Scan(&total)
+	totalPages := math.Ceil(float64(total) / float64(limit))
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": customers,
+		"meta": Pagination{
+			Page:       page,
+			Limit:      limit,
+			Total:      total,
+			TotalPages: int(totalPages),
+		},
+	})
 }
 func CreateCustomer(c *gin.Context) {
 	var customer model.Customer
@@ -260,12 +329,27 @@ func DeleteCustomer(c *gin.Context) {
 // ==================== Suppliers ====================
 func GetSuppliers(c *gin.Context) {
 	keyword := c.Query("keyword")
+	page, limit, offset := getPaginationParams(c)
+
 	suppliers := make([]model.Supplier, 0)
-	if err := database.DB.Raw("CALL sp_search_suppliers(?)", keyword).Scan(&suppliers).Error; err != nil {
+	if err := database.DB.Raw("CALL sp_search_suppliers(?, ?, ?)", keyword, limit, offset).Scan(&suppliers).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, suppliers)
+
+	var total int64
+	database.DB.Raw("CALL sp_count_suppliers(?)", keyword).Scan(&total)
+	totalPages := math.Ceil(float64(total) / float64(limit))
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": suppliers,
+		"meta": Pagination{
+			Page:       page,
+			Limit:      limit,
+			Total:      total,
+			TotalPages: int(totalPages),
+		},
+	})
 }
 
 func CreateSupplier(c *gin.Context) {
@@ -311,12 +395,27 @@ func DeleteSupplier(c *gin.Context) {
 // ==================== Inbounds ====================
 func GetInbounds(c *gin.Context) {
 	keyword := c.Query("keyword")
+	page, limit, offset := getPaginationParams(c)
+
 	inbounds := make([]SearchInboundRecord, 0)
-	if err := database.DB.Raw("CALL sp_search_inbounds(?)", keyword).Scan(&inbounds).Error; err != nil {
+	if err := database.DB.Raw("CALL sp_search_inbounds(?, ?, ?)", keyword, limit, offset).Scan(&inbounds).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, inbounds)
+
+	var total int64
+	database.DB.Raw("CALL sp_count_inbounds(?)", keyword).Scan(&total)
+	totalPages := math.Ceil(float64(total) / float64(limit))
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": inbounds,
+		"meta": Pagination{
+			Page:       page,
+			Limit:      limit,
+			Total:      total,
+			TotalPages: int(totalPages),
+		},
+	})
 }
 
 func CreateInbound(c *gin.Context) {
@@ -363,13 +462,28 @@ func CreateInbound(c *gin.Context) {
 func GetSales(c *gin.Context) {
 	keyword := c.Query("keyword")
 	filterType := c.Query("type") // e.g. "处方药"
+	page, limit, offset := getPaginationParams(c)
+
 	sales := make([]SearchSalesRecord, 0)
 	// Pass both keyword and filterType to SP
-	if err := database.DB.Raw("CALL sp_search_sales(?, ?)", keyword, filterType).Scan(&sales).Error; err != nil {
+	if err := database.DB.Raw("CALL sp_search_sales(?, ?, ?, ?)", keyword, filterType, limit, offset).Scan(&sales).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, sales)
+
+	var total int64
+	database.DB.Raw("CALL sp_count_sales(?, ?)", keyword, filterType).Scan(&total)
+	totalPages := math.Ceil(float64(total) / float64(limit))
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": sales,
+		"meta": Pagination{
+			Page:       page,
+			Limit:      limit,
+			Total:      total,
+			TotalPages: int(totalPages),
+		},
+	})
 }
 
 func CreateSale(c *gin.Context) {
@@ -1113,4 +1227,105 @@ func UpdateDatabaseConfig(c *gin.Context) {
 		"success": true,
 		"message": "Database configuration updated and connected",
 	})
+}
+
+// ==================== Sales Update/Delete (Admin Only) ====================
+
+func UpdateSale(c *gin.Context) {
+// Check admin permission
+userRole, exists := c.Get("role")
+if !exists || userRole != "admin" {
+c.JSON(http.StatusForbidden, gin.H{"error": "Admin permission required"})
+return
+}
+
+id := c.Param("id")
+var req struct {
+MedicineID int64 `json:"medicine_id"`
+CustomerID int64 `json:"customer_id"`
+Quantity   int   `json:"quantity"`
+}
+if err := c.ShouldBindJSON(&req); err != nil {
+c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+return
+}
+
+// Call stored procedure to update sale
+if err := database.DB.Exec("CALL sp_update_sale(?, ?, ?, ?)", 
+id, req.MedicineID, req.CustomerID, req.Quantity).Error; err != nil {
+c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+return
+}
+
+c.JSON(http.StatusOK, gin.H{"message": "Sale updated successfully"})
+}
+
+func DeleteSale(c *gin.Context) {
+// Check admin permission
+userRole, exists := c.Get("role")
+if !exists || userRole != "admin" {
+c.JSON(http.StatusForbidden, gin.H{"error": "Admin permission required"})
+return
+}
+
+id := c.Param("id")
+
+// Call stored procedure to delete sale
+if err := database.DB.Exec("CALL sp_delete_sale(?)", id).Error; err != nil {
+c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+return
+}
+
+c.JSON(http.StatusOK, gin.H{"message": "Sale deleted successfully"})
+}
+
+// ==================== Inbound Update/Delete (Admin Only) ====================
+
+func UpdateInbound(c *gin.Context) {
+// Check admin permission
+userRole, exists := c.Get("role")
+if !exists || userRole != "admin" {
+c.JSON(http.StatusForbidden, gin.H{"error": "Admin permission required"})
+return
+}
+
+id := c.Param("id")
+var req struct {
+MedicineID int64   `json:"medicine_id"`
+SupplierID int64   `json:"supplier_id"`
+Quantity   int     `json:"quantity"`
+Price      float64 `json:"price"`
+}
+if err := c.ShouldBindJSON(&req); err != nil {
+c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+return
+}
+
+// Call stored procedure to update inbound
+if err := database.DB.Exec("CALL sp_update_inbound(?, ?, ?, ?, ?)", 
+id, req.MedicineID, req.SupplierID, req.Quantity, req.Price).Error; err != nil {
+c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+return
+}
+
+c.JSON(http.StatusOK, gin.H{"message": "Inbound updated successfully"})
+}
+
+func DeleteInbound(c *gin.Context) {
+// Check admin permission
+userRole, exists := c.Get("role")
+if !exists || userRole != "admin" {
+c.JSON(http.StatusForbidden, gin.H{"error": "Admin permission required"})
+return
+}
+
+id := c.Param("id")
+
+// Call stored procedure to delete inbound
+if err := database.DB.Exec("CALL sp_delete_inbound(?)", id).Error; err != nil {
+c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+return
+}
+
+c.JSON(http.StatusOK, gin.H{"message": "Inbound deleted successfully"})
 }

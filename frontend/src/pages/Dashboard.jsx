@@ -43,9 +43,15 @@ export default function Dashboard() {
     return (
         <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <StatCard title="库存总量" value={stats.total_stock} trend="实时" icon={Pill} color="teal" />
-                <StatCard title="本月销售" value={`¥ ${stats.month_sales}`} trend="实时" icon={ShoppingCart} color="emerald" />
-                <StatCard title="临期/缺货预警" value={stats.low_stock} trend="需要补货" icon={AlertCircle} color="amber" isAlert={stats.low_stock > 0} />
+                <div onClick={() => navigate('/inventory')} className="cursor-pointer card-hover">
+                    <StatCard title="库存总量" value={stats.total_stock} trend="实时" icon={Pill} color="teal" />
+                </div>
+                <div onClick={() => navigate('/sales')} className="cursor-pointer card-hover">
+                    <StatCard title="本月销售" value={`¥ ${stats.month_sales}`} trend="实时" icon={ShoppingCart} color="emerald" />
+                </div>
+                <div onClick={() => navigate('/inventory?filter=low_stock')} className="cursor-pointer card-hover">
+                    <StatCard title="临期/缺货预警" value={stats.low_stock} trend="需要补货" icon={AlertCircle} color="amber" isAlert={stats.low_stock > 0} />
+                </div>
             </div>
 
             {/* Charts Section */}
